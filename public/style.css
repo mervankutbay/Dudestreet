@@ -422,3 +422,10 @@ button.pl-ok { color: var(--artı); border: 1.5px solid rgba(var(--altin-rgb), .
 .pl-ozet { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--ikinci); padding: 10px 12px; border-radius: 12px; background: rgba(0, 0, 0, .3); }
 .nb-snack { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + var(--alt-bosluk)); z-index: 60; display: flex; gap: 14px; align-items: center; background: var(--bg2); border: 1px solid rgba(var(--acik-rgb), .25); padding: 8px 8px 8px 16px; border-radius: 14px; font-size: 14px; }
 .nb-snack button { min-height: 36px; border-radius: 10px; font-size: 13px; }
+
+/* Logo (wordmark) — temanın yazı rengini alır */
+.wordmark { display: inline-block; flex: none; height: 40px; aspect-ratio: 644 / 252; background: var(--gotik-renk);
+  -webkit-mask: url(img/wordmark.png) center / contain no-repeat; mask: url(img/wordmark.png) center / contain no-repeat; }
+.wordmark.buyuk { height: auto; width: min(300px, 78vw); display: block; margin: 0 auto; }
+.wordmark.orta { height: auto; width: 190px; display: block; margin: 0 auto; }
+@media (max-width: 400px) { .marka .wordmark { height: 34px; } }

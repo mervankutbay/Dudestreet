@@ -156,8 +156,7 @@ async function wizard(adim) {
   if (adim === 'hosgeldin') {
     app().innerHTML = `
       <div class="giris-logo">
-        <img src="img/logo.svg" alt="" width="132" height="106">
-        <div class="isim gotik">Dudestreet</div>
+        <div class="wordmark buyuk" role="img" aria-label="Dudestreet"></div>
         <div class="est">Est. 2026 · Dudes Exchange</div>
         <p>Kendi Wall Street’in. Tüm mal varlığın, gelir-giderin, borçların ve hedefin tek yerde; gelecekteki sen de yanında.</p>
       </div>
@@ -275,7 +274,7 @@ async function geminiBagla(key, toSheet) {
 
 function renderReconnect() {
   chrome('sihirbaz');
-  app().innerHTML = `<div class="doldur"></div><div class="ortala"><img src="img/logo.svg" alt="" width="90" height="72"></div>
+  app().innerHTML = `<div class="doldur"></div><div class="ortala"><div class="wordmark orta" role="img" aria-label="Dudestreet"></div></div>
     ${baslik('Oturum', 'Borsa kısa bir mola verdi', 'Güvenlik için Google bağlantısı belli aralıklarla yenilenir. Verilerin yerinde, tek dokunuşla devam edersin.')}
     <div class="doldur"></div><button class="blok buyuk" id="tekrar">Tekrar bağlan</button>`;
   $('#tekrar').onclick = () => G.login();
