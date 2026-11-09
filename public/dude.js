@@ -1,10 +1,11 @@
 // Dudestreet — yapay zekâ karakterleri: oluşturma (kendin, tanıdığın biri, ünlü, serbest), karakter ve hafıza ekranı, sohbet
-import { S, $, $$, esc, num, money, moneyHam, fmt, today, toast, sheet, guard, ikon, pick, isDemo, CONFIG, ekle, tazele, lsGet, lsSet, onayKutusu, kapatBtn, uid } from './core.js';
+import { S, $, $$, esc, num, money, moneyHam, fmt, today, toast, sheet, guard, ikon, pick, isDemo, CONFIG, ekle, tazele, lsGet, lsSet, onayKutusu, kapatBtn, uid, izlemeBasla, izlemeBitir } from './core.js';
 import { SECTIONS, TANIDIK_SECTIONS, UNLU_SECTIONS, OZEL_SECTIONS, buildPersona, buildTanidik, buildOzel, unluIstek, polishInstruction, futureYear } from './persona.js';
 import * as AI from './gemini.js';
 import { chrome, adimCubugu, baslik } from './ui.js';
 import { hedefHesap } from './hesap.js';
-import { karakterler, aktifKarakter, karakterleriYaz, sohbetOku, sohbetYaz, sistemTalimati, islemAyikla, islemOzet, islemUygula, hafizaGuncelle } from './ai.js';
+import { karakterler, aktifKarakter, karakterleriYaz, sohbetOku, sohbetYaz, sistemTalimati, islemAyikla, islemOzet, islemUygula, hafizaGuncelle, ARAC, aracAc } from './ai.js';
+import { geriAl } from './plan.js';
 
 const ic = (k, s = 18) => ikon(k, 'currentColor', s);
 const app = () => $('#app');
@@ -216,18 +217,71 @@ export function renderPersona() {
 }
 
 // ---------- Sohbet ----------
+// Geri alınabilecek en son onaylı kart (sadece onda "Geri al" düğmesi çıkar)
+const sonGeriAlinabilir = () => { for (let i = S.chat.length - 1; i >= 0; i--) { const m = S.chat[i]; if (m.geri?.length && ['ok', 'hata'].includes(m.islemDurum)) return i; } return -1; };
 function mesajHTML(m, i) {
-  if (m.role === 'user') return `<div class="msj user">${esc(m.text)}</div>`;
+  if (m.role === 'user') return `<div class="msj user">${m.gorsel ? '<span class="msj-ek">📷 fotoğraf</span>' : ''}${esc(m.text)}</div>`;
   let h = `<div class="msj model ${m.hata ? 'hata' : ''}">${esc(m.text)}${m.kaynaklar?.length ? `<div class="kaynaklar">${m.kaynaklar.map(k => `<a href="${esc(k.url)}" target="_blank" rel="noopener">${esc(k.baslik)}</a>`).join('')}</div>` : ''}</div>`;
   if (m.islemler?.length) {
-    const durum = m.islemDurum;
-    h += `<div class="islem-kart ${m.islemler.some(o => islemOzet(o).kirmizi) ? 'kirmizi' : ''}">
+    const durum = m.islemDurum, veri = m.islemler.filter(o => !ARAC.has(o.tip)), arac = m.islemler.filter(o => ARAC.has(o.tip));
+    const acBtn = arac.length ? `<button class="kucuk-btn ${veri.length ? 'ikinci' : ''} bosluk" data-ac="${i}">${arac.length === 1 ? { hatirlat: '⏰ Takvime ekle', mesaj: '💬 Mesajı aç', ozet_paylas: '📊 Özeti aç' }[arac[0].tip] : 'Aç'}</button>` : '';
+    const geriBtn = m.geri?.length && i === sonGeriAlinabilir() ? `<button class="hayalet kucuk-btn" data-geri="${i}">↩️ Geri al</button>` : '';
+    h += `<div class="islem-kart ${veri.some(o => islemOzet(o).kirmizi) ? 'kirmizi' : ''}">
       ${m.islemler.map(o => { const z = islemOzet(o); return `<div class="islem-satir"><span class="islem-ik">${z.ik}</span><span class="bosluk"><b>${esc(z.ad)}</b><div class="mini">${esc(z.detay)}</div></span></div>`; }).join('')}
-      ${durum === 'ok' ? '<div class="islem-durum artı">✓ İşlendi</div>' : durum === 'iptal' ? '<div class="islem-durum">Vazgeçildi</div>' : durum === 'hata' ? `<div class="islem-durum eksi">⚠️ ${esc(m.islemHata || 'İşlenemedi')}</div>` : durum === 'isleniyor' ? '<div class="islem-durum">İşleniyor…</div>'
-        : `<div class="satir"><button class="ikinci kucuk-btn bosluk" data-islem="${i}" data-k="iptal">Vazgeç</button><button class="kucuk-btn bosluk" data-islem="${i}" data-k="ok">Onayla${m.islemler.length > 1 ? ` (${m.islemler.length})` : ''}</button></div>`}
+      ${!veri.length ? `<div class="satir">${acBtn}</div>`
+        : durum === 'ok' ? `<div class="satir"><div class="islem-durum artı bosluk">✓ İşlendi</div>${geriBtn}${acBtn}</div>` : durum === 'geri' ? '<div class="islem-durum">↩️ Geri alındı</div>' : durum === 'iptal' ? '<div class="islem-durum">Vazgeçildi</div>' : durum === 'hata' ? `<div class="satir"><div class="islem-durum eksi bosluk">⚠️ ${esc(m.islemHata || 'İşlenemedi')}</div>${geriBtn}</div>` : durum === 'isleniyor' ? '<div class="islem-durum">İşleniyor…</div>'
+        : `<div class="satir"><button class="ikinci kucuk-btn bosluk" data-islem="${i}" data-k="iptal">Vazgeç</button><button class="kucuk-btn bosluk" data-islem="${i}" data-k="ok">Onayla${veri.length > 1 ? ` (${veri.length})` : ''}</button></div>`}
     </div>`;
   }
   return h;
+}
+const KAMERA = '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+const MIKROFON = '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
+// Fotoğrafı en fazla 1600 px JPEG'e küçültür (hızlı gitsin, kotayı yemesin)
+async function fotoKucult(f) {
+  const url = URL.createObjectURL(f);
+  try {
+    const img = await new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = url; });
+    const o = Math.min(1, 1600 / Math.max(img.width, img.height)), c = document.createElement('canvas');
+    c.width = Math.round(img.width * o); c.height = Math.round(img.height * o);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    return { mime: 'image/jpeg', data: c.toDataURL('image/jpeg', 0.85).split(',')[1] };
+  } finally { URL.revokeObjectURL(url); }
+}
+let sesDurdur = null;
+async function sesliYaz(girdi, btn) {
+  if (sesDurdur) { sesDurdur(); return; }
+  const bitir = () => { btn.classList.remove('kayitta'); sesDurdur = null; girdi.dispatchEvent(new Event('input')); };
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SR) {
+    const r = new SR(), bas = girdi.value ? girdi.value.trimEnd() + ' ' : '';
+    r.lang = 'tr-TR'; r.interimResults = true; r.continuous = true;
+    r.onresult = e => { girdi.value = bas + [...e.results].map(x => x[0].transcript).join('').trim(); girdi.dispatchEvent(new Event('input')); };
+    r.onerror = e => { if (e.error === 'not-allowed') toast('Mikrofon izni verilmedi'); };
+    r.onend = bitir;
+    sesDurdur = () => { try { r.stop(); } catch { bitir(); } };
+    btn.classList.add('kayitta');
+    try { r.start(); } catch { bitir(); }
+    return;
+  }
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return toast('Bu tarayıcı sesle yazmayı desteklemiyor; klavyenin mikrofonunu kullan');
+  let akis;
+  try { akis = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { return toast('Mikrofon izni verilmedi'); }
+  const kayit = new MediaRecorder(akis), parca = [];
+  kayit.ondataavailable = e => e.data.size && parca.push(e.data);
+  kayit.onstop = async () => {
+    akis.getTracks().forEach(t => t.stop()); btn.classList.remove('kayitta'); btn.classList.add('dusunuyor'); sesDurdur = () => {};
+    try {
+      const blob = new Blob(parca, { type: (kayit.mimeType || 'audio/webm').split(';')[0] });
+      const data = await new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(',')[1]); fr.readAsDataURL(blob); });
+      const metin = await AI.yaziyaDok({ mime: blob.type, data });
+      if (metin) girdi.value = (girdi.value ? girdi.value.trimEnd() + ' ' : '') + metin;
+    } catch (e) { toast('Ses yazıya dökülemedi: ' + esc(e.message)); }
+    btn.classList.remove('dusunuyor'); bitir();
+  };
+  sesDurdur = () => { if (kayit.state === 'recording') kayit.stop(); };
+  btn.classList.add('kayitta'); kayit.start();
+  setTimeout(() => sesDurdur?.(), 60000);   // en fazla 1 dakika
 }
 const modelYazi = () => { const m = (AI.getModel() || '').replace('models/', ''), n = AI.sayac(); return `${m || 'gemini'} · bugün ${n} mesaj${n >= AI.GUNLUK_ANA ? ' (hafif modele geçildi)' : ` · ilk ${AI.GUNLUK_ANA} mesaj ana model`}`; };
 
@@ -255,7 +309,12 @@ export function renderDude() {
     <div style="height:130px"></div>
     <div class="yazma"><div class="yazma-ic" style="flex-direction:column;align-items:stretch">
       ${S.chat.some(m => m.role === 'user') ? '' : `<div class="oneriler">${ONERI.map(o => `<button class="ikinci" data-oneri="${esc(o)}">${esc(o)}</button>`).join('')}</div>`}
-      <div class="satir" style="align-items:flex-end"><textarea id="girdi" rows="1" placeholder="${esc(k.ad)}’a yaz…" aria-label="Mesaj"></textarea><button id="gonder" aria-label="Gönder">${ic('gonder', 20)}</button></div>
+      <div id="ekOnizleme" class="ek-onizleme hidden"></div>
+      <div class="satir yazma-satir" style="align-items:flex-end">
+        <button class="ikon-btn yazma-ek" id="foto" aria-label="Fotoğraf ekle (fiş, fatura, ekstre)">${KAMERA}</button>
+        <button class="ikon-btn yazma-ek" id="mikrofon" aria-label="Sesle yaz">${MIKROFON}</button>
+        <textarea id="girdi" rows="1" placeholder="${esc(k.ad)}’a yaz…" aria-label="Mesaj"></textarea><button id="gonder" aria-label="Gönder">${ic('gonder', 20)}</button></div>
+      <input type="file" id="fotoSec" accept="image/*" hidden>
     </div></div>`;
   $('#kDegis').onclick = karakterMenu;
   if ($('#temizle')) $('#temizle').onclick = () => { S.chat = []; sohbetYaz(k, []); renderDude(); };
@@ -263,6 +322,13 @@ export function renderDude() {
   girdi.oninput = () => { girdi.style.height = 'auto'; girdi.style.height = Math.min(140, girdi.scrollHeight) + 'px'; };
   girdi.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey && !matchMedia('(pointer: coarse)').matches) { e.preventDefault(); gonder(); } };
   $('#gonder').onclick = gonder;
+  // Fotoğraf: fiş, fatura, kart ekstresi… (küçültülüp sadece bu mesajla Gemini'ye gider, hiçbir yerde saklanmaz)
+  let ek = null;
+  const ekCiz = () => { const o = $('#ekOnizleme'); if (!o) return; o.classList.toggle('hidden', !ek); o.innerHTML = ek ? `<img src="data:${ek.mime};base64,${ek.data}" alt=""><span class="mini bosluk">Fotoğraf eklendi · istersen ne yapayım yaz</span><button class="ikon-btn" id="ekSil" aria-label="Fotoğrafı kaldır">${ic('carpi', 16)}</button>` : ''; if (ek) $('#ekSil').onclick = () => { ek = null; ekCiz(); }; };
+  $('#foto').onclick = () => $('#fotoSec').click();
+  $('#fotoSec').onchange = async e => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; try { ek = await fotoKucult(f); ekCiz(); girdi.focus(); } catch { toast('Fotoğraf okunamadı'); } };
+  // Sesle yazma: telefon destekliyorsa anında yazıya döker; desteklemiyorsa kaydı Gemini yazıya döker
+  $('#mikrofon').onclick = () => sesliYaz(girdi, $('#mikrofon'));
   $$('[data-oneri]').forEach(b => (b.onclick = () => { girdi.value = b.dataset.oneri; gonder(); }));
   islemBagla();
   window.scrollTo(0, document.body.scrollHeight);
@@ -273,25 +339,43 @@ export function renderDude() {
       const i = Number(b.dataset.islem), m = S.chat[i]; if (!m || m.islemDurum) return;
       if (b.dataset.k === 'iptal') { m.islemDurum = 'iptal'; sohbetYaz(k, S.chat); cizMesajlar(); return; }
       m.islemDurum = 'isleniyor'; cizMesajlar();
-      try { for (const o of m.islemler) await islemUygula(o); m.islemDurum = 'ok'; toast(pick(['✅ İşlendi', '✅ Tamamdır, kaydettim', '🔔 Borsaya işlendi'])); S.bant?.(); }
-      catch (e) { m.islemDurum = 'hata'; m.islemHata = e.message; }
+      if (S.tazeBekle) await S.tazeBekle.catch(() => {});
+      const veri = m.islemler.filter(o => !ARAC.has(o.tip)), arac = m.islemler.filter(o => ARAC.has(o.tip));
+      try {
+        if (veri.some(o => o.tip === 'geri_al')) {
+          const j = sonGeriAlinabilir(); if (j < 0) throw new Error('Geri alınacak bir işlem bulamadım');
+          await geriAl(S.chat[j].geri); S.chat[j].islemDurum = 'geri'; S.chat[j].geri = [];
+        }
+        izlemeBasla();
+        try { for (const o of veri.filter(o => o.tip !== 'geri_al')) await islemUygula(o); } finally { m.geri = izlemeBitir(); }
+        m.islemDurum = 'ok'; toast(pick(['✅ İşlendi', '✅ Tamamdır, kaydettim', '🔔 Borsaya işlendi'])); S.bant?.();
+      } catch (e) { m.islemDurum = 'hata'; m.islemHata = e.message; }
       sohbetYaz(k, S.chat); cizMesajlar();
+      if (m.islemDurum === 'ok') for (const o of arac) await aracAc(o);
+    });
+    $$('[data-ac]').forEach(b => b.onclick = async () => { const m = S.chat[Number(b.dataset.ac)]; for (const o of (m?.islemler || []).filter(o => ARAC.has(o.tip))) await aracAc(o); });
+    $$('[data-geri]').forEach(b => b.onclick = () => {
+      const m = S.chat[Number(b.dataset.geri)]; if (!m?.geri?.length) return;
+      onayKutusu('Bu işlemler geri alınsın mı?', 'Karttaki kayıtlar silinir, değiştirilenler eski hâline döner.', () => guard(async () => {
+        await geriAl(m.geri); m.islemDurum = 'geri'; m.geri = []; sohbetYaz(k, S.chat); cizMesajlar(); S.bant?.(); toast('↩️ Geri alındı');
+      }), { evetYazi: 'Geri al', tehlike: true });
     });
   }
   async function gonder() {
-    const text = girdi.value.trim();
+    sesDurdur?.();
+    const gorsel = ek, text = girdi.value.trim() || (gorsel ? 'Bu fotoğraftaki harcamaları işle.' : '');
     if (!text || S.busy) return;
     S.busy = true;
-    girdi.value = ''; girdi.style.height = 'auto';
+    girdi.value = ''; girdi.style.height = 'auto'; ek = null; ekCiz();
     $('.oneriler')?.remove();
-    S.chat.push({ role: 'user', text });
+    S.chat.push({ role: 'user', text, ...(gorsel ? { gorsel: true } : {}) });
     const kutu = $('#sohbet');
-    kutu.insertAdjacentHTML('beforeend', `<div class="msj user">${esc(text)}</div><div class="msj model" id="yaziyor"><span class="yaziyor"><span></span><span></span><span></span></span></div>`);
+    kutu.insertAdjacentHTML('beforeend', `<div class="msj user">${gorsel ? '<span class="msj-ek">📷 fotoğraf</span>' : ''}${esc(text)}</div><div class="msj model" id="yaziyor"><span class="yaziyor"><span></span><span></span><span></span></span></div>`);
     window.scrollTo(0, document.body.scrollHeight);
     try {
       // Onaylanan/vazgeçilen işlemler yapay zekâya not olarak iletilir (aynı şeyi tekrar önermesin)
       const gecmis = S.chat.slice(-30).map(m => ({ role: m.role, text: m.text + (m.islemler?.length ? (m.islemDurum === 'ok' ? '\n(Kullanıcı bu işlemleri onayladı, uygulamaya işlendi.)' : m.islemDurum === 'iptal' ? '\n(Kullanıcı bu işlemlerden vazgeçti.)' : '\n(İşlemler onay bekliyor.)') : '') }));
-      const r = await AI.sohbet({ system: sistemTalimati(k), history: gecmis });
+      const r = await AI.sohbet({ system: sistemTalimati(k), history: gecmis, ekler: gorsel ? [gorsel] : [] });
       const { text: cevap, islemler } = islemAyikla(r.text);
       const msg = { role: 'model', text: cevap || '👍' };
       if (islemler.length) msg.islemler = islemler;
@@ -302,7 +386,7 @@ export function renderDude() {
     } catch (e) {
       S.chat.pop();
       $('#yaziyor').outerHTML = `<div class="msj model hata">⚠️ ${esc(e.message || 'Bağlantı koptu')}</div>`;
-      girdi.value = text;
+      girdi.value = text; if (gorsel) { ek = gorsel; ekCiz(); }
       S.busy = false; return;
     } finally { S.busy = false; }
     cizMesajlar();

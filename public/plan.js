@@ -1,5 +1,5 @@
 // Dudestreet — notlardan çıkan "planlanan harcamalar" listesi (Nébula'daki gibi bu cihazda tutulur) ve onaylama
-import { S, $, esc, num, money, gunluk, today, buAy, ymOf, uid, lsGet, lsSet, toast, sheet, onayKutusu, guard, ekle, sil, guncelle, tazele, pick, tutarAlan, fmtIn, chips, chipBagla, chipVal, girdi } from './core.js';
+import { S, $, esc, num, money, gunluk, geriKaydet, today, buAy, ymOf, uid, lsGet, lsSet, toast, sheet, onayKutusu, guard, ekle, sil, guncelle, tazele, pick, tutarAlan, fmtIn, chips, chipBagla, chipVal, girdi } from './core.js';
 import { butceAy, butceGruplari, temelOnayli, onayKaydi, katIkon, varliklar, fiyatAnahtar } from './hesap.js';
 
 const PLAN_LS = 'ds_plan';
@@ -29,12 +29,13 @@ export function bekleyenToplam(ym, temel) {
 export async function onayDegistir(ym, kalem, ekleMi) {
   const var_ = onayKaydi(ym, kalem);
   if (ekleMi && !var_) await ekle('Onay', { Ay: ym, Kalem: kalem, Tarih: today() });
-  else if (!ekleMi && var_) { await S.db.deleteRow('Onay', var_._row); await tazele('Onay'); }
+  else if (!ekleMi && var_) { const { _row, ...satir } = var_; geriKaydet({ t: 'sil', sekme: 'Onay', satir }); await S.db.deleteRow('Onay', _row); await tazele('Onay'); }
 }
 // Bir ayın temel gider listesini yazar (o ay ve sonrası için geçerli olur, önceki aylar değişmez)
 export async function butceAyYaz(ym, items) {
   const guncel = await S.db.table('Bütçe');
   const silinecek = guncel.filter(r => ymOf(r['Ay']) === ym).map(r => r._row);
+  geriKaydet({ t: 'butce', sekme: 'Bütçe', ym, onceki: silinecek.length ? guncel.filter(r => ymOf(r['Ay']) === ym).map(r => ({ kalem: r['Kalem'], kategori: r['Kategori'], tutar: num(r['Tutar']), ikon: r['İkon'] || '' })) : null });
   if (silinecek.length) await S.db.deleteRows('Bütçe', silinecek);
   const temiz = items.filter(x => num(x.tutar) > 0);
   if (temiz.length) await S.db.appendObjs('Bütçe', temiz.map(x => ({ Ay: ym, Kalem: x.kalem, Kategori: x.kategori, Tutar: String(num(x.tutar)), 'İkon': x.ikon || '' })));
@@ -59,7 +60,7 @@ export async function giderGuncelle(g, yeni) {
   await guncelle('Giderler', g['Kimlik'], yeni);
   if (evet2(g['Birikimden'])) {
     const h = S.kayitlar.find(r => r['Bağ'] === g['Kimlik']);
-    if (h) await guncelle('Kayıtlar', h['Kimlik'], { ...(yeni.Kalem !== undefined ? { Not: yeni.Kalem } : {}), ...(yeni.Kategori !== undefined ? { Kategori: yeni.Kategori } : {}), ...(yeni.Tutar !== undefined ? { Tutar: yeni.Tutar } : {}) });
+    if (h) await guncelle('Kayıtlar', h['Kimlik'], { ...(yeni.Kalem !== undefined ? { Not: yeni.Kalem } : {}), ...(yeni.Kategori !== undefined ? { Kategori: yeni.Kategori } : {}), ...(yeni.Tutar !== undefined ? { Tutar: yeni.Tutar } : {}), ...(yeni.Tarih !== undefined ? { Tarih: yeni.Tarih } : {}) });
   }
 }
 // Birikim kaydı silinirken bir gidere bağlıysa gider de silinir (ikisi birlikte yaşar)
@@ -79,7 +80,7 @@ export async function varlikKaldir(kimlik) {
 export async function borcSil(kimlik) {
   await sil('Borçlar', kimlik);
   const hs = await S.db.table('Borç hareketleri'), satirlar = hs.filter(h => h['Borç'] === kimlik).map(h => h._row);
-  if (satirlar.length) { await S.db.deleteRows('Borç hareketleri', satirlar); gunluk('Silindi', 'Borç hareketleri', `${satirlar.length} hareket (silinen borçla birlikte)`); }
+  if (satirlar.length) { hs.filter(h => h['Borç'] === kimlik).forEach(({ _row, ...satir }) => geriKaydet({ t: 'sil', sekme: 'Borç hareketleri', satir })); await S.db.deleteRows('Borç hareketleri', satirlar); gunluk('Silindi', 'Borç hareketleri', `${satirlar.length} hareket (silinen borçla birlikte)`); }
   await tazele('Borç hareketleri');
 }
 
@@ -168,5 +169,23 @@ function satisSheet(p, bitti) {
       toast(harca ? pick(['😤 Satıp harcadın, Future Dude not aldı.', '💸 Satış kaydedildi, bu ayın birikiminden düştü.']) : '🏦 Satış kaydedildi, para birikimde.');
     }, bitti);
   };
+}
+// ---------- Geri alma: kaydedilen yazmaları tersten geri çevirir ----------
+export async function geriAl(liste) {
+  for (const o of [...(liste || [])].reverse()) {
+    if (o.t === 'ekle') {
+      if (o.obj.Kimlik) { await sil(o.sekme, o.obj.Kimlik); continue; }
+      // Kimliksiz satır (Onay, Hafıza): bütün alanları tutan son satır silinir
+      const t = await S.db.table(o.sekme), alanlar = Object.entries(o.obj).filter(([, v]) => v !== '' && v !== undefined && v !== null);
+      const r = t.filter(x => alanlar.every(([k, v]) => String(x[k]) === String(v))).pop();
+      if (r) { await S.db.deleteRow(o.sekme, r._row); gunluk('Silindi', o.sekme, 'geri alındı'); }
+      await tazele(o.sekme);
+    } else if (o.t === 'guncelle') await guncelle(o.sekme, o.kimlik, o.eski, o.alan);
+    else if (o.t === 'sil') await ekle(o.sekme, o.satir);
+    else if (o.t === 'butce') {
+      if (o.onceki) await butceAyYaz(o.ym, o.onceki);
+      else { const t = await S.db.table('Bütçe'), sat = t.filter(r => ymOf(r['Ay']) === o.ym).map(r => r._row); if (sat.length) await S.db.deleteRows('Bütçe', sat); await tazele('Bütçe'); }
+    } else if (o.t === 'kv') { await S.db.setKV(o.sekme, o.eski); S.ayar = await S.db.kv('Ayarlar'); }
+  }
 }
 export { fiyatAnahtar, butceGruplari };

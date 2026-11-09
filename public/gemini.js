@@ -48,7 +48,7 @@ const dusunme = m => gen3(m) ? [{ thinkingLevel: 'minimal' }, { thinkingLevel: '
 const kotu = new Set();
 
 // Sırayla modelleri dener. tur: 'sohbet' (günün ilk 20 mesajı ana model) | 'hafif'
-export async function uret({ system, contents, tur = 'sohbet', arama = false, json = false, sicaklik = 0.85, sure = 30000 }) {
+export async function uret({ system, contents, tur = 'sohbet', arama = false, json = false, sicaklik = 0.85, sure = 30000, uzun = false }) {
   const key = getKey(); if (!key) throw new Error('Gemini anahtarı bağlı değil');
   let sira = tur === 'hafif' ? hafifModeller() : sayac() < GUNLUK_ANA ? anaModeller() : [...hafifModeller().filter(m => /lite/.test(m)), ...anaModeller()];
   sira = [...sira.filter(m => !kotu.has(m)), ...sira.filter(m => kotu.has(m))];
@@ -56,7 +56,7 @@ export async function uret({ system, contents, tur = 'sohbet', arama = false, js
   for (const m of sira) {
     const adimlar = dusunme(m);
     for (let i = 0; i < adimlar.length; i++) {
-      const body = { contents, generationConfig: { temperature: sicaklik, maxOutputTokens: json ? 1500 : 2048 } };
+      const body = { contents, generationConfig: { temperature: sicaklik, maxOutputTokens: uzun ? 6000 : json ? 1500 : 2048 } };
       if (system) body.systemInstruction = { parts: [{ text: system }] };
       if (adimlar[i]) body.generationConfig.thinkingConfig = adimlar[i];
       if (json) body.generationConfig.responseMimeType = 'application/json';
@@ -92,9 +92,16 @@ export async function chat({ system, history, arama = false, tur = 'sohbet' }) {
   const contents = history.map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: String(m.text).slice(0, 4000) }] }));
   return (await uret({ system, contents, arama, tur })).text;
 }
-export async function sohbet({ system, history }) {
+// ekler: son kullanıcı mesajına eklenen fotoğraf/ses ({ mime, data(base64) })
+export async function sohbet({ system, history, ekler = [] }) {
   const contents = history.map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: String(m.text).slice(0, 4000) }] }));
-  return uret({ system, contents, arama: true, tur: 'sohbet' });
+  if (ekler.length && contents.length) contents[contents.length - 1].parts.push(...ekler.map(e => ({ inline_data: { mime_type: e.mime, data: e.data } })));
+  return uret({ system, contents, arama: !ekler.length, tur: 'sohbet', sure: ekler.length ? 75000 : 30000, uzun: ekler.length > 0 });
+}
+// Ses kaydını yazıya döker (hafif model)
+export async function yaziyaDok({ mime, data }) {
+  const r = await uret({ contents: [{ role: 'user', parts: [{ text: 'Bu ses kaydında söyleneni, söylendiği dilde, aynen yazıya dök. Sadece metni ver; açıklama, tırnak ya da başlık ekleme. Anlaşılmıyorsa boş bırak.' }, { inline_data: { mime_type: mime, data } }] }], tur: 'hafif', sicaklik: 0, sure: 40000 });
+  return r.text.trim();
 }
 // Tek seferlik JSON cevap (hafif model)
 export async function jsonSor({ prompt, sure = 20000 }) {

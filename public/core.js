@@ -286,8 +286,16 @@ export function gunluk(islem, sekme, ozet, eski = '') {
   const satir = { Zaman: new Date().toISOString(), 'İşlem': islem, Sekme: sekme, 'Özet': String(ozet).slice(0, 300), Eski: String(eski).slice(0, 300) };
   gunlukKuyruk = gunlukKuyruk.then(() => S.db.appendObj('Günlük', satir)).catch(() => {});
 }
-export async function ekle(sekme, obj) { const c = await S.db.appendObj(sekme, obj); gunluk('Eklendi', sekme, ozetle(obj)); await yerelEkle(sekme, [obj], c); }
-export async function ekleCok(sekme, objs) { if (!objs.length) return; const c = await S.db.appendObjs(sekme, objs); objs.forEach(o => gunluk('Eklendi', sekme, ozetle(o))); await yerelEkle(sekme, objs, c); }
+// ---------- Geri alma kaydı: izleme açıkken her yazma, nasıl geri alınacağıyla birlikte not edilir ----------
+let izlenen = null;
+const IZLENMEZ = new Set(['Geçmiş', 'Günlük']);
+export function izlemeBasla() { izlenen = []; }
+export function izlemeBitir() { const l = izlenen || []; izlenen = null; return l; }
+export function geriKaydet(o) { if (izlenen && !IZLENMEZ.has(o.sekme)) izlenen.push(o); }
+const temizSatir = r => { const { _row, ...o } = r; return o; };
+
+export async function ekle(sekme, obj) { geriKaydet({ t: 'ekle', sekme, obj: { ...obj } }); const c = await S.db.appendObj(sekme, obj); gunluk('Eklendi', sekme, ozetle(obj)); await yerelEkle(sekme, [obj], c); }
+export async function ekleCok(sekme, objs) { if (!objs.length) return; objs.forEach(o => geriKaydet({ t: 'ekle', sekme, obj: { ...o } })); const c = await S.db.appendObjs(sekme, objs); objs.forEach(o => gunluk('Eklendi', sekme, ozetle(o))); await yerelEkle(sekme, objs, c); }
 // Kimlik (ya da verilen alan) ile satırı bulur, güncel tablodan satır numarasını okur
 // Satır numarası güvenliği için tablo yazmadan hemen önce tazeden okunur; yazdıktan sonra tekrar okunmaz, bu liste güncellenir
 async function satirBul(sekme, alan, deger) {
@@ -298,6 +306,7 @@ export async function guncelle(sekme, kimlik, yeni, alan = 'Kimlik') {
   const { guncel, r } = await satirBul(sekme, alan, kimlik);
   if (!r) throw new Error('Kayıt tabloda bulunamadı, sayfayı yenile');
   const { _row, ...eski } = r;
+  geriKaydet({ t: 'guncelle', sekme, alan, kimlik, eski: Object.fromEntries(Object.keys(yeni).map(k => [k, eski[k] ?? ''])) });
   await S.db.writeObj(sekme, _row, { ...eski, ...yeni });
   const degisen = Object.fromEntries(Object.entries(yeni).filter(([k, v]) => String(eski[k] ?? '') !== String(v ?? '')));
   if (Object.keys(degisen).length) gunluk('Değişti', sekme, `${r['Ad'] || r['Kalem'] || r['Not'] || r['Kod'] || ''} → ${ozetle(degisen)}`, ozetle(Object.fromEntries(Object.keys(degisen).map(k => [k, eski[k]]))));
@@ -307,13 +316,14 @@ export async function guncelle(sekme, kimlik, yeni, alan = 'Kimlik') {
 export async function sil(sekme, kimlik, alan = 'Kimlik') {
   const { guncel, r } = await satirBul(sekme, alan, kimlik);
   if (!r) return tabloKoy(sekme, guncel);
+  geriKaydet({ t: 'sil', sekme, satir: temizSatir(r) });
   await S.db.deleteRow(sekme, r._row); gunluk('Silindi', sekme, ozetle(r), ozetle(r));
   tabloKoy(sekme, guncel.filter(x => x !== r).map(x => x._row > r._row ? { ...x, _row: x._row - 1 } : x));
 }
 export async function silHepsi(sekme, f) {
   const guncel = await S.db.table(sekme);
   const l = guncel.filter(f), satirlar = l.map(r => r._row);
-  if (satirlar.length) { await S.db.deleteRows(sekme, satirlar); l.forEach(r => gunluk('Silindi', sekme, ozetle(r), ozetle(r))); }
+  if (satirlar.length) { l.forEach(r => geriKaydet({ t: 'sil', sekme, satir: temizSatir(r) })); await S.db.deleteRows(sekme, satirlar); l.forEach(r => gunluk('Silindi', sekme, ozetle(r), ozetle(r))); }
   await tazele(sekme);
 }
 

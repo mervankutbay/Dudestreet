@@ -1,5 +1,6 @@
 // Dudestreet — Notlar (Nébula'daki gibi): çok sayfalı notlar, "Listeye çevir" ile harcama listesi, gelir-gidere aktarma.
 // Ek: saat/tarih geçen satırlar (ör. "Özel ders akşam 16:30") için takvime alarmlı etkinlik ekleme.
+import { takvimPenceresi } from './paylas.js';
 import { S, $, $$, katmanKaydet, esc, num, money, today, buAy, uid, toast, sheet, onayKutusu, guard, ikon, pick, trFold, buyukIlk, lsGet, lsSet, tutarAlan, fmtIn, isDemo, girdi } from './core.js';
 import { butceAy, katIkon, birlesikKat, katAd, varliklar, ayHesap } from './hesap.js';
 
@@ -124,40 +125,9 @@ export function zamanBul(satir, simdi = new Date()) {
     .replace(/\b(yarın|yarin|bugün|bugun|öbür gün|akşam|aksam|sabah|gece|öğleden sonra|saat)\b/gi, ' ').replace(/\s+/g, ' ').trim()) || satir.trim();
   return { tarih: d, baslik };
 }
-const ikiHane = n => String(n).padStart(2, '0');
-const icsZaman = d => `${d.getUTCFullYear()}${ikiHane(d.getUTCMonth() + 1)}${ikiHane(d.getUTCDate())}T${ikiHane(d.getUTCHours())}${ikiHane(d.getUTCMinutes())}00Z`;
-function icsYap({ baslik, tarih, sure = 60, alarm = 15, not = '' }) {
-  const bit = new Date(tarih.getTime() + sure * 60000), escI = s => String(s).replace(/[\\;,]/g, m => '\\' + m).replace(/\n/g, '\\n');
-  return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Dudestreet//Notlar//TR', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'BEGIN:VEVENT',
-    `UID:${uid()}@dudestreet`, `DTSTAMP:${icsZaman(new Date())}`, `DTSTART:${icsZaman(tarih)}`, `DTEND:${icsZaman(bit)}`, `SUMMARY:${escI(baslik)}`, not ? `DESCRIPTION:${escI(not)}` : '',
-    'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${escI(baslik)}`, `TRIGGER:-PT${alarm}M`, 'END:VALARM', 'END:VEVENT', 'END:VCALENDAR'].filter(Boolean).join('\r\n');
-}
 function takvimSheet(satir, bulunan, sonra) {
-  const d = bulunan.tarih, tarihStr = `${d.getFullYear()}-${ikiHane(d.getMonth() + 1)}-${ikiHane(d.getDate())}`, saatStr = `${ikiHane(d.getHours())}:${ikiHane(d.getMinutes())}`;
-  const el = sheet(`<h3>⏰ Takvime ekle</h3><p class="mini">Notundaki satır: “${esc(satir)}”</p>
-    <label class="etiket" for="tkBaslik">Etkinlik</label><input id="tkBaslik" maxlength="80" value="${esc(bulunan.baslik)}">
-    <div class="iki"><div><label class="etiket" for="tkTarih">Tarih</label><input type="date" id="tkTarih" value="${tarihStr}"></div>
-    <div><label class="etiket" for="tkSaat">Saat</label><input type="time" id="tkSaat" value="${saatStr}"></div></div>
-    <label class="etiket" for="tkAlarm">Alarm</label><select id="tkAlarm"><option value="0">Tam vaktinde</option><option value="15" selected>15 dakika önce</option><option value="30">30 dakika önce</option><option value="60">1 saat önce</option><option value="1440">1 gün önce</option></select>
-    <button class="blok" id="tkIcs" style="margin-top:14px">📅 Telefonumun takvimine ekle</button>
-    <button class="blok ikinci" id="tkGoogle">Google Takvim’de aç</button>
-    <p class="mini">Telefon takvimi seçeneği alarmı da kurar. Google Takvim’de bildirim, takviminin varsayılan ayarına göre gelir.</p>`);
-  const oku = () => { const [y, mo, g] = $('#tkTarih', el).value.split('-').map(Number), [h, mi] = $('#tkSaat', el).value.split(':').map(Number); return { baslik: $('#tkBaslik', el).value.trim() || satir, tarih: new Date(y, mo - 1, g, h, mi), alarm: Number($('#tkAlarm', el).value) }; };
-  const isaretle = () => { const l = lsGet(TAKVIM_LS, []); l.push(trFold(satir)); lsSet(TAKVIM_LS, l.slice(-200)); sonra?.(); };
-  $('#tkIcs', el).onclick = () => {
-    const o = oku(); if (isNaN(o.tarih)) return toast('Tarih ve saati kontrol et');
-    const ics = icsYap(o), ad = trFold(o.baslik).replace(/ /g, '-').slice(0, 40) || 'etkinlik';
-    const ios = /iP(hone|ad|od)/.test(navigator.userAgent);
-    if (ios) location.href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
-    else { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' })); a.download = ad + '.ics'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); }
-    isaretle(); el.remove(); toast('📅 Takvim dosyası açıldı; takvim uygulamanda “Ekle”ye bas.');
-  };
-  $('#tkGoogle', el).onclick = () => {
-    const o = oku(); if (isNaN(o.tarih)) return toast('Tarih ve saati kontrol et');
-    const bit = new Date(o.tarih.getTime() + 3600000);
-    const u = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(o.baslik)}&dates=${icsZaman(o.tarih)}/${icsZaman(bit)}&details=${encodeURIComponent('Dudestreet notlarından')}`;
-    window.open(u, '_blank', 'noopener'); isaretle(); el.remove();
-  };
+  takvimPenceresi({ baslik: bulunan.baslik, tarih: bulunan.tarih, aciklama: `Notundaki satır: “${esc(satir)}”`, not: 'Dudestreet notlarından',
+    sonra: () => { const l = lsGet(TAKVIM_LS, []); l.push(trFold(satir)); lsSet(TAKVIM_LS, l.slice(-200)); sonra?.(); } });
 }
 
 // ---------- Kaydetme kuyruğu (yazarken kaybolmasın; tabloya biraz gecikmeli yazılır) ----------

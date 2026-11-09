@@ -93,7 +93,7 @@ h1 { font-size: 30px; } h2 { font-size: 22px; } h3 { font-size: 17px; display: f
 .ayrac { display: flex; align-items: center; gap: 12px; } .ayrac::before, .ayrac::after { content: ''; flex: 1; height: 1px; background: rgba(255, 255, 255, .1); }
 
 /* Borsa bandı */
-.bant { position: sticky; top: 0; z-index: 30; height: calc(30px + var(--ust-bosluk)); padding-top: var(--ust-bosluk); background: rgba(0, 0, 0, .9); border-bottom: 1px solid rgba(var(--acik-rgb), .14); overflow: hidden; font-family: 'Space Grotesk', ui-monospace, monospace; font-size: 12px; letter-spacing: .02em; }
+.bant { position: sticky; top: 0; z-index: 30; height: calc(30px + var(--ust-bosluk)); padding-top: var(--ust-bosluk); background: #000; border-bottom: 1px solid rgba(var(--acik-rgb), .14); overflow: hidden; font-family: 'Space Grotesk', ui-monospace, monospace; font-size: 12px; letter-spacing: .02em; }
 .bant-ic { display: inline-flex; gap: 26px; height: 30px; align-items: center; white-space: nowrap; padding-left: 100%; animation: kay 46s linear infinite; }
 .bant-ic span b { margin-left: 5px; }
 @keyframes kay { to { transform: translateX(-100%); } }
@@ -443,3 +443,19 @@ body.modal-acik { overflow: hidden; }
 /* Akıcılık: kayan bant ayrı katmanda çizilir; kaydırırken pahalı bulanıklık yok */
 .bant-ic { will-change: transform; }
 .sekmeler, .bant { transform: translateZ(0); }
+
+/* Paylaşma */
+.gg-paylas { display: flex; margin: 10px auto 0; }
+.oz-onizleme { border-radius: 16px; overflow: hidden; background: rgba(255,255,255,.03); min-height: 120px; }
+.oz-onizleme img { display: block; width: 100%; height: auto; }
+
+/* Sohbet: fotoğraf ve ses */
+.yazma-satir { gap: 6px; }
+.yazma .yazma-ek { width: 38px; min-height: 48px; border-radius: 14px; flex: none; color: var(--soluk); }
+.yazma .yazma-ek.kayitta { background: rgba(255, 107, 125, .18); color: var(--eksi); animation: nabiz 1.2s ease-in-out infinite; }
+.yazma .yazma-ek.dusunuyor { opacity: .6; }
+@keyframes nabiz { 50% { box-shadow: 0 0 0 6px rgba(255, 107, 125, .12); } }
+.ek-onizleme { display: flex; align-items: center; gap: 10px; padding: 6px; background: var(--kart-bg); border: 1px solid rgba(255,255,255,.1); border-radius: 14px; }
+.ek-onizleme img { width: 44px; height: 44px; object-fit: cover; border-radius: 10px; }
+.msj-ek { display: block; font-size: 12px; opacity: .75; margin-bottom: 2px; }
+.islem-kart .satir .islem-durum { margin: 0; }

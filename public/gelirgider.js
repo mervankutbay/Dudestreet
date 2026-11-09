@@ -225,6 +225,7 @@ export function renderGelirGider() {
         <div><span class="mini">Birikim</span><b class="vurgu">−${money(h.yatirilan, 0)}</b></div>
       </div>
       ${h.gelir ? '' : '<div class="mini ortala">bu ay için henüz gelir girilmedi</div>'}
+      ${h.gelir || h.gider ? '<button class="ikinci kucuk-btn gg-paylas" id="ggPaylas">📤 Ayın özetini paylaş</button>' : ''}
       ${bekToplam > 0.004 ? `<div class="gg-bek-ozet mini">⏳ Onay bekleyen <b>−${money(bekToplam, 0)}</b> · hepsi onaylanırsa ay sonu <b class="${tahmin >= 0 ? 'artı' : 'eksi'}">${tahmin >= 0 ? '+' : '−'}${money(Math.abs(tahmin), 0)}</b></div>` : ''}
     </div>
     <div class="kart gg-kart">
@@ -251,6 +252,7 @@ export function renderGelirGider() {
   $$('[data-ay]', v).forEach(b => b.onclick = () => { S.ggAy = ymAdd(ym, Number(b.dataset.ay)); renderGelirGider(); });
   $$('[data-ym]', v).forEach(b => b.onclick = () => { S.ggAy = b.dataset.ym; renderGelirGider(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
   $('#ggButce', v).onclick = () => butceSheet(ym);
+  if ($('#ggPaylas', v)) $('#ggPaylas', v).onclick = async () => (await import('./paylas.js')).ozetPenceresi(ym);
   if (seg === 'gider') katCipBagla(v, 'ggKat', () => katYenile(v, 'ggKat'));
   raporBagla(v);
   $$('[data-ted]', v).forEach(b => b.onclick = () => { const i = Number(b.dataset.ted); if (h.temel[i]) temelDuzenle(ym, i); });
