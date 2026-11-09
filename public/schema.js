@@ -47,6 +47,14 @@ export const MIGRATIONS = [
       await db.ensureSheet('Kayıtlar', ['Bağ']);
     },
   },
+  {
+    to: 3,
+    title: 'Değişiklik günlüğü',
+    changes: ['➕ "Günlük" sekmesi (eklenen, değişen ve silinen kayıtlar, eski hâliyle)'],
+    async run(db) {
+      await db.ensureSheet('Günlük', ['Zaman', 'İşlem', 'Sekme', 'Özet', 'Eski']);
+    },
+  },
 ];
 
 export const pendingMigrations = current => MIGRATIONS.filter(m => m.to > current);

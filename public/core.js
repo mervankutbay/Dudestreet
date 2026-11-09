@@ -44,9 +44,20 @@ export const girdi = v => {
   return Number(n) || 0;
 };
 export const fmt = (n, k = 0) => (Number(n) || 0).toLocaleString('tr-TR', { minimumFractionDigits: k, maximumFractionDigits: k });
-export const money = (n, k) => { const v = Number(n) || 0; const kk = k ?? (Math.abs(v) < 100 && v % 1 ? 2 : 0); return `${fmt(v, kk)} ${pb()}`; };
-export const kisaPara = v => { const a = Math.abs(v), s = v < 0 ? '−' : ''; return a >= 1e6 ? `${s}${fmt(a / 1e6, a >= 1e7 ? 1 : 2)} Mn` : a >= 1e4 ? `${s}${fmt(a / 1e3, 0)} B` : `${s}${fmt(a, 0)}`; };
-export const fiyatFmt = n => { const v = Math.abs(Number(n) || 0); return fmt(n, v >= 1000 ? 0 : v >= 1 ? 2 : 4); };
+// Görüntüleme: kayıtlar hep ana para biriminde (Ayarlar), ekranda ₺/€/$ arasında çevrilebilir ve gizlenebilir
+const SIMGE = { TRY: '₺', EUR: '€', USD: '$', GBP: '£' };
+export const gizli = () => lsGet('ds_gizli', false);
+export const gosterKod = () => { const g = lsGet('ds_gosterPara', null); return g && g !== paraKod() && S.kurlar[g] > 0 ? g : paraKod(); };
+export const gosterSimge = () => SIMGE[gosterKod()] || pb();
+const cevirGoster = v => { const g = gosterKod(); return g === paraKod() ? v : v / S.kurlar[g]; };
+export const money = (n, k) => {
+  if (gizli()) return `•••• ${gosterSimge()}`;
+  const v = cevirGoster(Number(n) || 0); const kk = k ?? (Math.abs(v) < 100 && v % 1 ? 2 : 0); return `${fmt(v, kk)} ${gosterSimge()}`;
+};
+// Ana para biriminde, gizlenmeden (giriş alanları ve yapay zekâ için)
+export const moneyHam = (n, k) => { const v = Number(n) || 0; const kk = k ?? (Math.abs(v) < 100 && v % 1 ? 2 : 0); return `${fmt(v, kk)} ${pb()}`; };
+export const kisaPara = v0 => { if (gizli()) return '••••'; const v = cevirGoster(v0); const a = Math.abs(v), s = v < 0 ? '−' : ''; return a >= 1e6 ? `${s}${fmt(a / 1e6, a >= 1e7 ? 1 : 2)} Mn` : a >= 1e4 ? `${s}${fmt(a / 1e3, 0)} B` : `${s}${fmt(a, 0)}`; };
+export const fiyatFmt = n0 => { const n = cevirGoster(Number(n0) || 0), v = Math.abs(n); return fmt(n, v >= 1000 ? 0 : v >= 1 ? 2 : 4); };
 export const yuzde = (n, k = 1) => `${n >= 0 ? '▲' : '▼'} %${fmt(Math.abs(n), k)}`;
 export const isaretli = n => `${n >= 0 ? '+' : '−'}${money(Math.abs(n))}`;
 export const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -155,15 +166,24 @@ export const fmtIn = v => (num(v) ? String(Math.round(num(v) * 100) / 100).repla
 // Sekme adı → durum alanı
 export const TABLOLAR = {
   'Kayıtlar': 'kayitlar', 'Portföy': 'portfoy', 'Hafıza': 'hafiza', 'Gelir': 'gelir', 'Giderler': 'giderler', 'Bütçe': 'butce',
-  'Onay': 'onay', 'Kategori': 'kategori', 'Notlar': 'notlar', 'Borçlar': 'borclar', 'Borç hareketleri': 'borcHareket', 'Geçmiş': 'gecmis',
+  'Onay': 'onay', 'Kategori': 'kategori', 'Notlar': 'notlar', 'Borçlar': 'borclar', 'Borç hareketleri': 'borcHareket', 'Geçmiş': 'gecmis', 'Günlük': 'gunlukler',
 };
 export async function tazele(...sekmeler) {
   const l = await Promise.all(sekmeler.map(t => S.db.table(t)));
   sekmeler.forEach((t, i) => { S[TABLOLAR[t]] = l[i]; });
   if (sekmeler.includes('Portföy')) S.portfoy = S.portfoy.filter(p => num(p['Adet']) > 0);
 }
-export async function ekle(sekme, obj) { await S.db.appendObj(sekme, obj); await tazele(sekme); }
-export async function ekleCok(sekme, objs) { await S.db.appendObjs(sekme, objs); await tazele(sekme); }
+// ---------- Değişiklik günlüğü (Günlük sekmesi): arka planda yazılır, işlemi bekletmez ----------
+const GUNLUKSUZ = new Set(['Geçmiş', 'Notlar', 'Günlük']);
+const ozetle = o => Object.entries(o || {}).filter(([k, v]) => !['Kimlik', '_row', 'İkon', 'Bağ'].includes(k) && v !== '' && v !== undefined).map(([k, v]) => `${k}: ${v}`).join(' · ').slice(0, 300);
+let gunlukKuyruk = Promise.resolve();
+export function gunluk(islem, sekme, ozet, eski = '') {
+  if (!S.db || GUNLUKSUZ.has(sekme)) return;
+  const satir = { Zaman: new Date().toISOString(), 'İşlem': islem, Sekme: sekme, 'Özet': String(ozet).slice(0, 300), Eski: String(eski).slice(0, 300) };
+  gunlukKuyruk = gunlukKuyruk.then(() => S.db.appendObj('Günlük', satir)).catch(() => {});
+}
+export async function ekle(sekme, obj) { await S.db.appendObj(sekme, obj); gunluk('Eklendi', sekme, ozetle(obj)); await tazele(sekme); }
+export async function ekleCok(sekme, objs) { await S.db.appendObjs(sekme, objs); objs.forEach(o => gunluk('Eklendi', sekme, ozetle(o))); await tazele(sekme); }
 // Kimlik (ya da verilen alan) ile satırı bulur, güncel tablodan satır numarasını okur
 async function satirBul(sekme, alan, deger) {
   const guncel = await S.db.table(sekme);
@@ -174,17 +194,19 @@ export async function guncelle(sekme, kimlik, yeni, alan = 'Kimlik') {
   if (!r) throw new Error('Kayıt tabloda bulunamadı, sayfayı yenile');
   const { _row, ...eski } = r;
   await S.db.writeObj(sekme, _row, { ...eski, ...yeni });
+  const degisen = Object.fromEntries(Object.entries(yeni).filter(([k, v]) => String(eski[k] ?? '') !== String(v ?? '')));
+  if (Object.keys(degisen).length) gunluk('Değişti', sekme, `${r['Ad'] || r['Kalem'] || r['Not'] || r['Kod'] || ''} → ${ozetle(degisen)}`, ozetle(Object.fromEntries(Object.keys(degisen).map(k => [k, eski[k]]))));
   await tazele(sekme);
 }
 export async function sil(sekme, kimlik, alan = 'Kimlik') {
   const r = await satirBul(sekme, alan, kimlik);
-  if (r) await S.db.deleteRow(sekme, r._row);
+  if (r) { await S.db.deleteRow(sekme, r._row); gunluk('Silindi', sekme, ozetle(r), ozetle(r)); }
   await tazele(sekme);
 }
 export async function silHepsi(sekme, f) {
   const guncel = await S.db.table(sekme);
-  const satirlar = guncel.filter(f).map(r => r._row);
-  if (satirlar.length) await S.db.deleteRows(sekme, satirlar);
+  const l = guncel.filter(f), satirlar = l.map(r => r._row);
+  if (satirlar.length) { await S.db.deleteRows(sekme, satirlar); l.forEach(r => gunluk('Silindi', sekme, ozetle(r), ozetle(r))); }
   await tazele(sekme);
 }
 

@@ -32,7 +32,11 @@ export function hedefFormBagla(kok, { bitti, zorunlu = false }) {
     const paraDegisti = para !== (S.ayar.para_birimi || '₺');
     await S.db.setKV('Ayarlar', { hedef_ne: ne, hedef_tur: tur, hedef_tutar: String(tutar || ''), aylik_min: String(girdi($('#hMin', kok).value) || ''), para_birimi: para, hedef_tarih: $('#hTarih', kok).value || '' });
     S.ayar = await S.db.kv('Ayarlar');
-    if (S.persona.cevapObj && S.persona.kaynak === 'anket') { const prompt = buildPersona({ ...S.persona.cevapObj, ...S.ayar }); await S.db.setKV('Persona', { prompt }); S.persona.prompt = prompt; }
+    // "Gelecekteki ben" karakterleri hedefi kişilik metninde de bilir: anketten üretilmişlerse yeni hedefle yeniden üretilir
+    const { karakterler, karakterleriYaz } = await import('./ai.js');
+    const l = karakterler(); let degisti = false;
+    l.forEach(k => { if (k.tip === 'ben' && k.kaynak === 'anket' && k.cevaplar) { k.prompt = buildPersona({ ...k.cevaplar, ...S.ayar }); degisti = true; } });
+    if (degisti) await karakterleriYaz(l);
     if (paraDegisti) S.fiyat = { para: '', fiyatlar: {}, zaman: null, hata: null };
     bitti?.(paraDegisti);
   };

@@ -10,6 +10,8 @@ const UA = {
   accept: 'application/json,text/plain,*/*',
 };
 const OZ = 31.1034768; // 1 ons = 31,1 gram
+// Uygulama sürümü: public/config.js'teki APP_VERSION ile aynı tutulur (telefonda eski sürüm kalırsa "güncelle" uyarısı çıkar)
+const SURUM = 'v3';
 
 const json = (obj, status = 200, maxAge = 0) =>
   new Response(JSON.stringify(obj), {
@@ -181,7 +183,7 @@ export default {
     const p = url.pathname;
     try {
       if (p === '/api/ayar') {
-        return json({ googleClientId: String(env.GOOGLE_CLIENT_ID || '').trim(), surum: 'v1' });
+        return json({ googleClientId: String(env.GOOGLE_CLIENT_ID || '').trim(), surum: SURUM });
       }
       if (p === '/api/fiyatlar' && request.method === 'POST') {
         const b = await request.json().catch(() => ({}));

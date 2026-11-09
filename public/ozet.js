@@ -117,7 +117,7 @@ function grafikBagla() {
 // ---------- Özet sayfası ----------
 export function renderOzet() {
   const m = malVarligi(), h = hedefHesap(), ym = buAy(), ay = ayHesap(ym), bek = bekleyenToplam(ym, ay.temel);
-  const ad = S.persona.cevapObj?.ad || '';
+  const ad = (() => { try { const l = JSON.parse(S.persona.karakterler || '[]'); return (l.find(k => k.id === S.persona.aktif) || l[0])?.cevaplar?.ad || S.persona.cevapObj?.ad || ''; } catch { return ''; } })();
   const saat = new Date().getHours(), selam = saat < 6 ? 'İyi geceler' : saat < 12 ? 'Günaydın' : saat < 18 ? 'İyi günler' : 'İyi akşamlar';
   const gruplar = Object.entries(m.gruplar).filter(([, v]) => v > 0.5).sort((a, b) => b[1] - a[1]);
   const yakin = borclar().filter(x => x.borc > 0 && x.kalanGun !== null && x.kalanGun <= 7).sort((a, b) => a.kalanGun - b.kalanGun);

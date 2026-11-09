@@ -1,5 +1,5 @@
 // Dudestreet — Varlıklar: hisse, kripto, altın, döviz, nakit, ev, arsa, araba, MBKAYO payı…
-import { S, $, $$, esc, num, money, fmt, fiyatFmt, yuzde, today, uid, toast, sheet, onayKutusu, guard, ekle, tazele, ikon, pick, tutarAlan, fmtIn, kapatBtn, paraKod, pb, evet, tarihFmt, girdi } from './core.js';
+import { S, $, $$, esc, num, gunluk, money, moneyHam, gosterSimge, fmt, fiyatFmt, yuzde, today, uid, toast, sheet, onayKutusu, guard, ekle, tazele, ikon, pick, tutarAlan, fmtIn, kapatBtn, paraKod, pb, evet, tarihFmt, girdi } from './core.js';
 import { VARLIK_TURLERI, turBilgi, canliMi, varliklar, malVarligi, ARTIS_KAYNAK, GRUP_RENK, fiyatAnahtar, buyumeli } from './hesap.js';
 
 const ic = (k, s = 18) => ikon(k, 'currentColor', s);
@@ -36,7 +36,7 @@ export function renderVarliklar() {
   const grupBaslik = { 'Yatırım': '📈 Yatırımlar', 'Nakit': '🏦 Nakit ve banka', 'Gayrimenkul': '🏠 Gayrimenkul', 'Araç': '🚗 Araçlar', 'Diğer': '📦 Diğer' };
   const satir = x => `<li data-varlik="${esc(x.p['Kimlik'])}" class="tikla">
       <span class="varlik-ik">${rozetIc(x.p)}</span>
-      <span class="bosluk"><b>${esc(x.p['Ad'] || x.p['Sembol'])}</b>${x.hedefte ? ' <span class="rozet vurgu-rozet">🎯 hedefte</span>' : ''}<div class="mini">${x.canli && x.p['Tür'] !== 'MBKAYO payı' ? `${fmt(x.adet, x.adet % 1 ? 4 : 0)} × ${fiyatFmt(x.fiyat)} ${pb()}` : x.p['Tür'] === 'MBKAYO payı' ? (x.canli ? 'canlı · toplam bakiye ÷ 6' : x.hata ? 'bakiye alınamadı' : 'bakiye geliyor…') : x.tahmini ? `tahmini · yıllık %${fmt(x.oran, 1)} artış` : esc(x.p['Tür'])}${!x.canli && canliMi(x.p) && x.p['Tür'] !== 'MBKAYO payı' ? ` <span class="rozet">${x.hata ? 'fiyat yok' : '…'}</span>` : ''}</div></span>
+      <span class="bosluk"><b>${esc(x.p['Ad'] || x.p['Sembol'])}</b>${x.hedefte ? ' <span class="rozet vurgu-rozet">🎯 hedefte</span>' : ''}<div class="mini">${x.canli && x.p['Tür'] !== 'MBKAYO payı' ? `${fmt(x.adet, x.adet % 1 ? 4 : 0)} × ${fiyatFmt(x.fiyat)} ${gosterSimge()}` : x.p['Tür'] === 'MBKAYO payı' ? (x.canli ? 'canlı · toplam bakiye ÷ 6' : x.hata ? 'bakiye alınamadı' : 'bakiye geliyor…') : x.tahmini ? `tahmini · yıllık %${fmt(x.oran, 1)} artış` : esc(x.p['Tür'])}${!x.canli && canliMi(x.p) && x.p['Tür'] !== 'MBKAYO payı' ? ` <span class="rozet">${x.hata ? 'fiyat yok' : '…'}</span>` : ''}</div></span>
       <span class="sag"><div class="tutar">${money(x.deger)}</div><div class="mini ${x.canli ? (x.gunluk >= 0 ? 'artı' : 'eksi') : x.kar >= 0 ? 'artı' : 'eksi'}">${x.canli && x.p['Tür'] !== 'MBKAYO payı' ? `${yuzde(x.gunluk, 2)} bugün` : x.alis && Math.abs(x.kar) > 0.5 ? `${x.kar >= 0 ? '+' : '−'}${money(Math.abs(x.kar))}` : ''}</div></span>
     </li>`;
   $('#app').innerHTML = `
@@ -44,7 +44,7 @@ export function renderVarliklar() {
       <div class="satir"><span class="ust-etiket">Varlıkların</span><span class="bosluk"></span><button class="ikon-btn" id="yenile" aria-label="Fiyatları yenile" title="Fiyatları yenile">${ic('yenile', 18)}</button></div>
       <div class="buyuk-rakam">${money(mv.varlik)}</div>
       ${yatirim.length ? `<div class="satir kucuk"><span class="${kar >= 0 ? 'artı' : 'eksi'}">Yatırım ${kar >= 0 ? '+' : '−'}${money(Math.abs(kar))} (${yuzde(alis ? kar / alis * 100 : 0)})</span><span class="bosluk"></span><span class="${mv.gunluk >= 0 ? 'artı' : 'eksi'}">${mv.gunluk >= 0 ? '+' : '−'}${money(Math.abs(mv.gunluk))} bugün</span></div>` : ''}
-      <div class="mini">${S.fiyat.hata ? `⚠️ Canlı fiyat alınamadı: ${esc(S.fiyat.hata)}` : zaman ? `Fiyatlar ${zaman} itibarıyla · ${pb()} cinsinden · birikim hesabın Hedef sekmesinde` : v.length ? 'Fiyatlar yükleniyor…' : 'Hisseden eve, kriptodan arabaya her şeyini ekle; hepsi tek yerde toplansın.'}</div>
+      <div class="mini">${S.fiyat.hata ? `⚠️ Canlı fiyat alınamadı: ${esc(S.fiyat.hata)}` : zaman ? `Fiyatlar ${zaman} itibarıyla · ${gosterSimge()} cinsinden · birikim hesabın Hedef sekmesinde` : v.length ? 'Fiyatlar yükleniyor…' : 'Hisseden eve, kriptodan arabaya her şeyini ekle; hepsi tek yerde toplansın.'}</div>
     </div>
     <button class="blok buyuk" id="varlikEkle">${ic('arti', 20)} Varlık ekle</button>
     ${gruplar.map(g => { const l = v.filter(x => x.grup === g); return l.length ? `<div class="kart"><div class="satir"><h3 class="bosluk">${grupBaslik[g]}</h3><b class="tutar">${money(l.reduce((s, x) => s + x.deger, 0))}</b></div><ul class="liste">${l.map(satir).join('')}</ul></div>` : ''; }).join('')}
@@ -76,13 +76,13 @@ export function varlikEkle(baslangicTur = 'Hisse') {
       <button class="blok buyuk" id="vKaydet" style="margin-top:14px">Ekle</button>` : ''}`;
     if ($('#vDegis', el)) $('#vDegis', el).onclick = () => { secim = null; canliForm(); $('#vAra', el)?.focus(); };
     if (mbk) {
-      fetch('/api/mbkayo?para=' + paraKod()).then(r => r.json()).then(j => { if (!$('#vCanli', el)) return; $('#vCanli', el).innerHTML = j.hata ? '⚠️ ' + esc(j.hata) : `Şu an <b>${money(j.kisiBasi)}</b> · fon toplamı ${money(j.toplam)}`; }).catch(() => { if ($('#vCanli', el)) $('#vCanli', el).textContent = 'Bakiye alınamadı, sonra yenilenir.'; });
+      fetch('/api/mbkayo?para=' + paraKod()).then(r => r.json()).then(j => { if (!$('#vCanli', el)) return; $('#vCanli', el).innerHTML = j.hata ? '⚠️ ' + esc(j.hata) : `Şu an <b>${moneyHam(j.kisiBasi, 0)}</b> · fon toplamı ${moneyHam(j.toplam, 0)}`; }).catch(() => { if ($('#vCanli', el)) $('#vCanli', el).textContent = 'Bakiye alınamadı, sonra yenilenir.'; });
     } else if (secim) {
       fetch('/api/fiyatlar', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ liste: [{ tur, sembol: secim.sembol }], para: paraKod() }) })
         .then(r => r.json()).then(j => {
           const f = j.fiyatlar?.[`${tur}|${secim.sembol}`]; if (!$('#vCanli', el)) return;
           if (!f || f.hata) { $('#vCanli', el).textContent = 'Canlı fiyat alınamadı; alış fiyatını sen gir.'; return; }
-          $('#vCanli', el).innerHTML = `Şu an <b>${fiyatFmt(f.fiyat)} ${pb()}</b> <span class="${f.degisim >= 0 ? 'artı' : 'eksi'}">${yuzde(f.degisim, 2)}</span>`;
+          $('#vCanli', el).innerHTML = `Şu an <b>${moneyHam(f.fiyat, f.fiyat >= 1000 ? 0 : 2)}</b> <span class="${f.degisim >= 0 ? 'artı' : 'eksi'}">${yuzde(f.degisim, 2)}</span>`;
           if (!$('#vMaliyet', el).value) $('#vMaliyet', el).value = String(Number(f.fiyat.toPrecision(6))).replace('.', ',');
         }).catch(() => { if ($('#vCanli', el)) $('#vCanli', el).textContent = 'Canlı fiyat alınamadı; alış fiyatını sen gir.'; });
     }
@@ -190,8 +190,8 @@ export function varlikDetay(kimlik) {
   const satirYaz = async yeni => {
     const guncel = await S.db.table('Portföy'), h = guncel.find(y => y['Kimlik'] === p['Kimlik']);
     if (!h) throw new Error('Varlık tabloda bulunamadı, sayfayı yenile');
-    if (yeni === null) await S.db.deleteRow('Portföy', h._row);
-    else { const { _row, ...o } = h; await S.db.writeObj('Portföy', _row, { ...o, ...yeni }); }
+    if (yeni === null) { await S.db.deleteRow('Portföy', h._row); gunluk('Silindi', 'Portföy', `${h['Ad']} (${h['Tür']}) · adet ${h['Adet']}`, `${h['Ad']} · maliyet ${h['Maliyet']}`); }
+    else { const { _row, ...o } = h; await S.db.writeObj('Portföy', _row, { ...o, ...yeni }); gunluk('Değişti', 'Portföy', `${h['Ad']} → ${Object.entries(yeni).map(([k, v]) => `${k}: ${v}`).join(' · ')}`, Object.keys(yeni).map(k => `${k}: ${h[k]}`).join(' · ')); }
     await tazele('Portföy');
   };
   const islem = fn => guard(async () => { S.busy = true; $$('button', el).forEach(b => (b.disabled = true)); try { await fn(); } finally { S.busy = false; } el.remove(); S.go('varliklar'); });

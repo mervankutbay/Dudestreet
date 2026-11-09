@@ -1,5 +1,5 @@
 // Dudestreet — notlardan çıkan "planlanan harcamalar" listesi (Nébula'daki gibi bu cihazda tutulur) ve onaylama
-import { S, $, esc, num, money, today, buAy, ymOf, uid, lsGet, lsSet, toast, sheet, onayKutusu, guard, ekle, sil, tazele, pick, tutarAlan, fmtIn, chips, chipBagla, chipVal, girdi } from './core.js';
+import { S, $, esc, num, money, gunluk, today, buAy, ymOf, uid, lsGet, lsSet, toast, sheet, onayKutusu, guard, ekle, sil, tazele, pick, tutarAlan, fmtIn, chips, chipBagla, chipVal, girdi } from './core.js';
 import { butceAy, butceGruplari, temelOnayli, onayKaydi, katIkon, varliklar, fiyatAnahtar } from './hesap.js';
 
 const PLAN_LS = 'ds_plan';
@@ -39,6 +39,8 @@ export async function butceAyYaz(ym, items) {
   const temiz = items.filter(x => num(x.tutar) > 0);
   if (temiz.length) await S.db.appendObjs('Bütçe', temiz.map(x => ({ Ay: ym, Kalem: x.kalem, Kategori: x.kategori, Tutar: String(num(x.tutar)), 'İkon': x.ikon || '' })));
   else await S.db.appendObjs('Bütçe', [{ Ay: ym, Kalem: '-', Kategori: 'Diğer', Tutar: '0', 'İkon': '' }]);   // boş liste de "bu ay temel gider yok" demektir
+  const eski = guncel.filter(r => ymOf(r['Ay']) === ym).map(r => `${r['Kalem']} ${r['Tutar']}`).join(', ');
+  gunluk('Değişti', 'Bütçe', `${ym} temel giderler: ${temiz.map(x => `${x.kalem} ${num(x.tutar)}`).join(', ') || 'yok'}`, eski);
   await tazele('Bütçe');
 }
 export async function giderEkle({ tarih, kalem, kategori, tutar, birikimden, not = '', ikon = '' }) {

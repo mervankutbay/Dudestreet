@@ -104,14 +104,26 @@ export async function findAppSheets() {
   return j.files || [];
 }
 
-export async function tagFile(id, value) {
-  return api(`${DRIVE}/${id}?fields=id`, { method: 'PATCH', body: JSON.stringify({ appProperties: { [CONFIG.APP_PROPERTY]: value } }) });
+export async function tagFile(id, value, ek = {}) {
+  return api(`${DRIVE}/${id}?fields=id`, { method: 'PATCH', body: JSON.stringify({ appProperties: { [CONFIG.APP_PROPERTY]: value, ...ek } }) });
+}
+export async function renameFile(id, name) {
+  return api(`${DRIVE}/${id}?fields=id`, { method: 'PATCH', body: JSON.stringify({ name }) });
 }
 
-export async function copyFile(id, name) {
-  const j = await api(`${DRIVE}/${id}/copy?fields=id,name`, { method: 'POST', body: JSON.stringify({ name }) });
-  await tagFile(j.id, 'backup'); // yedek, ana tablo sanılmasın
+// Kopya (yedek ya da geri yüklenen ana tablo)
+export async function copyFile(id, name, tag = 'backup', ek = {}) {
+  const j = await api(`${DRIVE}/${id}/copy?fields=id,name,createdTime`, { method: 'POST', body: JSON.stringify({ name }) });
+  await tagFile(j.id, tag, ek);
   return j;
+}
+export async function listBackups() {
+  const q = `appProperties has { key='${CONFIG.APP_PROPERTY}' and value='backup' } and trashed=false`;
+  const j = await api(`${DRIVE}?q=${encodeURIComponent(q)}&orderBy=createdTime desc&pageSize=200&fields=files(id,name,createdTime,appProperties)`);
+  return j.files || [];
+}
+export async function deleteFile(id) {
+  return api(`${DRIVE}/${id}`, { method: 'DELETE' });
 }
 
 export function getSheetId() { return localStorage.getItem(LS.sheet); }

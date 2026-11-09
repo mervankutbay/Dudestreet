@@ -1,7 +1,7 @@
 // Dudestreet — kendi Wall Street'in.
 // Veri kullanıcının kendi Google Sheet'inde, yapay zekâ (Future Dude) kullanıcının kendi Gemini anahtarıyla.
 // Sunucu sadece piyasa fiyatlarını getirir; hiçbir kullanıcı verisi tutmaz.
-import { CONFIG, S, $, $$, esc, num, money, fmt, today, buAy, ymAdd, uid, isDemo, toast, sheet, modal, onayKutusu, guard, ikon, pick, lsGet, lsSet, yuzde, fiyatFmt } from './core.js';
+import { CONFIG, S, $, $$, esc, num, money, fmt, today, buAy, ymAdd, uid, isDemo, toast, sheet, modal, onayKutusu, guard, ikon, pick, lsGet, lsSet, yuzde, fiyatFmt, gizli, gosterKod, gosterSimge, paraKod, pb } from './core.js';
 import * as G from './google.js';
 import * as AI from './gemini.js';
 import { runMigrations, pendingMigrations } from './schema.js';
@@ -15,6 +15,8 @@ import { renderVarliklar, fiyatlariGetir, kisaSembol } from './varliklar.js';
 import { renderBorclar } from './borclar.js';
 import { renderHedef, hedefFormHTML, hedefFormBagla, hedefDuzenle } from './hedef.js';
 import { renderDude, renderPersona, startSurvey } from './dude.js';
+import { karakterler } from './ai.js';
+import { otomatikYedek, yedekPenceresi, gunlukPenceresi, zorlaGuncelle } from './yedek.js';
 import { notlarAc, notFlush } from './notlar.js';
 
 const app = () => $('#app');
@@ -25,7 +27,8 @@ async function boot() {
   temaUygula(aktifTema());
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   $$('#sekmeler button, .ust-btn').forEach(b => b.onclick = () => b.dataset.view === 'notlar' ? notlarAc() : go(b.dataset.view));
-  try { const r = await fetch('/api/ayar', { cache: 'no-store' }); if (r.ok) CONFIG.GOOGLE_CLIENT_ID = (await r.json()).googleClientId || ''; } catch { /* çevrimdışı */ }
+  try { const r = await fetch('/api/ayar', { cache: 'no-store' }); if (r.ok) { const j = await r.json(); CONFIG.GOOGLE_CLIENT_ID = j.googleClientId || ''; S.sunucuSurum = j.surum || ''; } } catch { /* çevrimdışı */ }
+  ustAraclar();
   const r = G.handleRedirect();
   if (r.error && !['interaction_required', 'login_required', 'consent_required'].includes(r.error)) toast('Google girişi tamamlanmadı: ' + esc(r.error));
   if (isDemo()) { S.db = LocalDB.exists() ? new LocalDB() : await demoKur(); return baglandi(); }
@@ -60,7 +63,7 @@ async function yukle() {
   S.portfoy = S.portfoy.filter(p => num(p['Adet']) > 0);
   S.ayar = ayar;
   if (!S.ayar.baslangic) { await db.setKV('Ayarlar', { baslangic: today() }); S.ayar.baslangic = today(); }
-  S.persona = persona;
+  S.persona = persona; S._karakterler = null;
   try { S.persona.cevapObj = persona.cevaplar ? JSON.parse(persona.cevaplar) : null; } catch { S.persona.cevapObj = null; }
   if (!AI.getKey() && S.meta.gemini_key) AI.setKey(S.meta.gemini_key);
   if (!AI.getModel() && S.meta.gemini_model) AI.setModel(S.meta.gemini_model);
@@ -73,9 +76,28 @@ async function baglandi() {
     await yukle();
     if (!AI.getKey() && S.meta.gemini_atlandi !== '1') return wizard('gemini');
     if (!S.ayar.hedef_ne && S.meta.hedef_atlandi !== '1') return wizard('hedef');
-    if (!S.persona.prompt && localStorage.getItem('ds_anket_sonra') !== '1') return startSurvey();
+    if (!karakterler().length && localStorage.getItem('ds_anket_sonra') !== '1') return startSurvey();
     go('ozet');
+    setTimeout(otomatikYedek, 4000);
+    if (S.sunucuSurum && S.sunucuSurum !== CONFIG.APP_VERSION) setTimeout(() => toast(`⬆️ Yeni sürüm hazır (${esc(S.sunucuSurum)}). Ayarlar → Uygulamayı güncelle`, 7000), 1500);
   });
+}
+
+// ---------- Üst çubuk: bakiye gizle, para birimi ----------
+const GOZ_ACIK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const GOZ_KAPALI = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.6 9.6 0 0 0 4.3-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+function ustAraclar() {
+  const g = $('#btnGizle'), p = $('#btnPara');
+  const ciz = () => { g.innerHTML = gizli() ? GOZ_KAPALI : GOZ_ACIK; g.classList.toggle('on', gizli()); g.setAttribute('aria-label', gizli() ? 'Tutarları göster' : 'Tutarları gizle'); p.textContent = gosterSimge(); };
+  g.onclick = () => { lsSet('ds_gizli', !gizli()); ciz(); S.yenile(); toast(gizli() ? '🙈 Tutarlar gizlendi' : '👀 Tutarlar görünüyor'); };
+  p.onclick = () => {
+    const ana = paraKod(), sira = [ana, ...['TRY', 'EUR', 'USD'].filter(k => k !== ana && S.kurlar[k] > 0)];
+    if (sira.length < 2) return toast('Kurlar henüz gelmedi, birazdan tekrar dene');
+    const yeni = sira[(sira.indexOf(gosterKod()) + 1) % sira.length];
+    lsSet('ds_gosterPara', yeni); ciz(); S.yenile();
+    toast(yeni === ana ? `💱 Ana para birimi (${gosterSimge()})` : `💱 Tutarlar ${gosterSimge()} cinsinden (1 ${gosterSimge()} = ${fmt(S.kurlar[yeni], 2)} ${pb()})`);
+  };
+  S.ustCiz = ciz; ciz();
 }
 
 // ---------- Gezinme ----------
@@ -103,7 +125,7 @@ async function fiyatYenile(sessiz = true) {
   try { await fiyatlariGetir(sessiz); } finally { S.fiyatBekliyor = false; }
 }
 S.fiyatYenile = fiyatYenile;
-S.fiyatGeldi = () => { S.yenile(); gecmisYaz(); };
+S.fiyatGeldi = () => { S.yenile(); S.ustCiz?.(); gecmisYaz(); };
 setInterval(() => { if (document.visibilityState === 'visible' && S.db && ['ozet', 'varliklar', 'hedef'].includes(S.view)) fiyatYenile(); }, 90_000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && S.db && S.fiyat.zaman && Date.now() - Date.parse(S.fiyat.zaman) > 60_000) fiyatYenile(); });
 
@@ -274,10 +296,10 @@ function renderAyarlar() {
       <p class="mini" style="margin:0">${S.ayar.hedef_ne ? `${esc(S.ayar.hedef_ne)}${num(S.ayar.hedef_tutar) ? ' · ' + money(num(S.ayar.hedef_tutar)) : ''}${num(S.ayar.aylik_min) ? ' · ayda en az ' + money(num(S.ayar.aylik_min)) : ''}` : 'Hedef koymadın.'} · Para birimi ${esc(S.ayar.para_birimi || '₺')}</p>
     </div>
     <div class="kart">
-      <h3>🤖 Future Dude</h3>
+      <h3>🤖 Yapay zekâ</h3>
       ${AI.getKey() ? `<p class="mini">Gemini bağlı ✅ · ${esc((AI.getModel() || '').replace('models/', ''))} · anahtar …${esc(AI.getKey().slice(-4))}</p>
         ${isDemo() ? '' : `<label class="onay"><input type="checkbox" id="kis" ${keyInSheet ? 'checked' : ''}><span>Anahtarım kendi tablomda da saklansın</span></label>`}
-        <div class="satir"><button class="ikinci bosluk" id="kisilik">🧬 Kişilik</button><button class="ikinci bosluk" id="degis">Anahtarı değiştir</button><button class="tehlike" id="kaldir">Kaldır</button></div>`
+        <div class="satir"><button class="ikinci bosluk" id="kisilik">🎭 Karakterler</button><button class="ikinci bosluk" id="degis">Anahtarı değiştir</button><button class="tehlike" id="kaldir">Kaldır</button></div>`
         : '<p class="mini">Gemini bağlı değil. Future Dude ve notlardaki akıllı ayırma için gerekli.</p><button class="blok" id="degis">🔑 Gemini’yi bağla</button>'}
     </div>
     <div class="kart">
@@ -285,9 +307,15 @@ function renderAyarlar() {
       ${isDemo() ? '<p class="mini">Demo modu: veriler sadece bu tarayıcıda. Gerçek kullanım için demodan çıkıp Google ile bağlan.</p>' : `
       <p class="mini">Hesap: <b>${esc(G.userEmail())}</b><br>Tüm verilerin kendi Drive’ındaki tabloda. Dudestreet hiçbir sunucuda veri tutmaz.</p>
       <a class="btn ikinci blok" href="${G.sheetUrl(S.db.id)}" target="_blank" rel="noopener">📄 Tablomu Google Sheets’te aç</a>
-      <button class="ikinci blok" id="yedekAl">🗂️ Şimdi yedek al</button>
-      ${S.meta.son_yedek ? `<p class="mini">Son yedek: <a href="${G.sheetUrl(S.meta.son_yedek)}" target="_blank" rel="noopener">${new Date(S.meta.son_yedek_tarih).toLocaleString('tr-TR')}</a></p>` : ''}`}
-      <p class="mini">Tablo sürümü ${S.sema} · uygulama ${CONFIG.APP_VERSION}</p>
+      ${S.meta.son_yedek ? `<p class="mini">Son yedek: ${new Date(S.meta.son_yedek_tarih).toLocaleString('tr-TR')}</p>` : ''}`}
+      <button class="ikinci blok" id="yedekler">🛟 Yedekler ve geri yükleme</button>
+      <button class="ikinci blok" id="gunlukAc">🧾 Değişiklik günlüğü</button>
+    </div>
+    <div class="kart">
+      <h3>⬆️ Uygulama</h3>
+      <p class="mini">Sürüm ${CONFIG.APP_VERSION} · tablo sürümü ${S.sema}${S.sunucuSurum && S.sunucuSurum !== CONFIG.APP_VERSION ? ` · <b class="altin">yeni sürüm hazır: ${esc(S.sunucuSurum)}</b>` : ''}</p>
+      <button class="${S.sunucuSurum && S.sunucuSurum !== CONFIG.APP_VERSION ? '' : 'ikinci '}blok" id="guncelle">Uygulamayı güncelle</button>
+      <p class="mini" style="margin:0">Telefonda eski sürüm takılı kaldıysa buna bas; verilerine dokunmaz.</p>
     </div>
     <div class="kart">
       <h3>📲 Telefona kur</h3>
@@ -301,17 +329,13 @@ function renderAyarlar() {
   $('#degis').onclick = () => wizard('gemini');
   if ($('#kaldir')) $('#kaldir').onclick = () => guard(async () => { AI.setKey(''); AI.setModel(''); await S.db.setKV('_meta', { gemini_key: '', gemini_atlandi: '1' }); S.meta.gemini_key = ''; S.meta.gemini_atlandi = '1'; toast('Anahtar kaldırıldı'); renderAyarlar(); });
   if ($('#kis')) $('#kis').onchange = e => guard(async () => { await S.db.setKV('_meta', { gemini_key: e.target.checked ? AI.getKey() : '' }); S.meta.gemini_key = e.target.checked ? AI.getKey() : ''; toast(e.target.checked ? 'Anahtar tablona kaydedildi' : 'Anahtar tablondan silindi (sadece bu cihazda)'); });
-  if ($('#yedekAl')) $('#yedekAl').onclick = () => guard(async () => {
-    $('#yedekAl').disabled = true;
-    const b = await G.copyFile(S.db.id, `Dudestreet Yedek – ${new Date().toLocaleString('tr-TR')}`);
-    await S.db.setKV('_meta', { son_yedek: b.id, son_yedek_tarih: new Date().toISOString() });
-    S.meta = await S.db.kv('_meta');
-    toast('✅ Yedek Drive’ına kaydedildi'); renderAyarlar();
-  });
+  $('#yedekler').onclick = yedekPenceresi;
+  $('#gunlukAc').onclick = gunlukPenceresi;
+  $('#guncelle').onclick = zorlaGuncelle;
   $('#cikis').onclick = () => {
     notFlush();
     if (isDemo()) { LocalDB.wipe(); localStorage.removeItem('ds_demo'); } else G.logout();
-    ['ds_gemini_key', 'ds_gemini_model', 'ds_anket_taslak', 'ds_anket_sonra', 'ds_plan', 'ds_notBekle', 'ds_sonNot', 'ds_katBekle'].forEach(k => localStorage.removeItem(k));
+    ['ds_gemini_key', 'ds_gemini_model', 'ds_anket_taslak', 'ds_anket_sonra', 'ds_plan', 'ds_notBekle', 'ds_sonNot', 'ds_katBekle', 'ds_gizli', 'ds_gosterPara', 'ds_demo_yedekler'].forEach(k => localStorage.removeItem(k));
     location.reload();
   };
 }

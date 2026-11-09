@@ -198,3 +198,110 @@ ${JSON.stringify(answers, null, 2)}
 TASLAK:
 ${draft}`;
 }
+
+// ---------- Diğer karakter türleri ----------
+const SERTLIK_SORU = { id: 'sertlik', tip: 'slider', soru: 'Paran konusunda ne kadar sert olsun?', min: 1, max: 5, varsayilan: 3, uclar: ['Hep şefkatli 🥰', 'Acımasız koç 😤'] };
+const UZUNLUK_SORU = { id: 'uzunluk', tip: 'choice', soru: 'Mesajları nasıl olsun?', secenekler: ['Kısa, mesajlaşır gibi', 'Orta', 'Uzun ve detaylı'], varsayilan: 'Kısa, mesajlaşır gibi' };
+
+export const TANIDIK_SECTIONS = [
+  {
+    id: 'kim', baslik: 'Kim?', ikon: '🫶', aciklama: 'Babanı, anneni, kardeşini, bir arkadaşını… istediğin birini anlat.',
+    sorular: [
+      { id: 'karakter_ad', tip: 'text', soru: 'Ona ne diyorsun? (karakterin adı)', ornek: 'Babam, Aydın Bey, Ece abla', zorunlu: true },
+      { id: 'iliski', tip: 'choice', soru: 'Senin neyin oluyor?', secenekler: ['Babam', 'Annem', 'Kardeşim', 'Abim / ablam', 'Eşim / sevgilim', 'Arkadaşım', 'Dedem / ninem', 'Başka'], varsayilan: 'Babam' },
+      { id: 'ad', tip: 'text', soru: 'Senin adın ne?', ornek: 'Deniz', zorunlu: true },
+      { id: 'hitap', tip: 'text', soru: 'Sana nasıl seslenir?', ornek: 'oğlum, Bay Deniz, kuzum' },
+      { id: 'kisilik', tip: 'textarea', soru: 'Nasıl biri? 3-5 kelimeyle ya da birkaç cümleyle anlat', ornek: 'Disiplinli, şakacı, borsayla yatıp kalkar, israfa dayanamaz' },
+      { id: 'para_tavri', tip: 'textarea', soru: 'Parayla ilişkisi, sana verdiği nasihatler', ornek: '"Gelmeden harcama", "altın her zaman kurtarır", her kuruşun hesabını sorar' },
+    ],
+  },
+  {
+    id: 'konusma', baslik: 'Konuşma tarzı', ikon: '💬', aciklama: 'En önemli kısım: tam onun gibi konuşmalı.',
+    sorular: [
+      { id: 'sozler', tip: 'textarea', satir: 4, soru: 'Sık kullandığı sözler, lafları, ağzından düşmeyenler', ornek: '"Bak bakayım bana", "aklını başına al", "helal olsun be"' },
+      { id: 'kizinca', tip: 'text', soru: 'Kızınca ne der?', ornek: '"Bay Deniz! Bu ne biçim iş?"' },
+      { id: 'sevinince', tip: 'text', soru: 'Sevinince / aferin derken ne der?', ornek: '"Aslan oğlum benim"' },
+      { id: 'ornek_cevap', tip: 'textarea', satir: 3, soru: '"Markete 2.000 verdim, bir de kulaklık aldım" dersen TAM OLARAK ne derdi?', ornek: 'Kulaklık mı? Eskisi ne oldu? Bu ay kaç para biriktirdin önce onu söyle.' },
+      { id: 'emojiler', tip: 'multi', soru: 'Emoji kullanır mı? En çok hangileri?', secenekler: ['Kullanmaz', '😂', '👍', '🙏', '😎', '😤', '❤️', '💪', '🤦', '🔥', '👀', '😏'] },
+      UZUNLUK_SORU,
+    ],
+  },
+  {
+    id: 'tavir', baslik: 'Tavrı', ikon: '🧐', aciklama: 'Senin paranla ilgili nasıl davransın?',
+    sorular: [SERTLIK_SORU, { id: 'kirmizi_cizgi', tip: 'textarea', soru: 'Asla yapmasın / açmasın dediğin şeyler', ornek: 'Sağlığımla ilgili şaka yapmasın' }],
+  },
+];
+
+export const UNLU_SECTIONS = [
+  {
+    id: 'unlu', baslik: 'Ünlü biri', ikon: '⭐', aciklama: 'Adını yaz; onun tanınan tarzından esinlenen bir karakter oluşturayım. Sonra istediğin gibi düzeltebilirsin.',
+    sorular: [
+      { id: 'karakter_ad', tip: 'text', soru: 'Kim olsun?', ornek: 'Warren Buffett, Cem Yılmaz, Barış Manço', zorunlu: true },
+      { id: 'rol', tip: 'choice', soru: 'Senin için ne olsun?', secenekler: ['Finans koçum', 'Kankam', 'Akıl hocam', 'Eğlenceli yorumcu'], varsayilan: 'Finans koçum' },
+      { id: 'ad', tip: 'text', soru: 'Senin adın ne?', ornek: 'Deniz', zorunlu: true },
+      { id: 'hitap', tip: 'text', soru: 'Sana nasıl seslensin?', ornek: 'dostum, evlat, hocam' },
+      SERTLIK_SORU, UZUNLUK_SORU,
+      { id: 'ek', tip: 'textarea', soru: 'Eklemek istediğin bir şey (isteğe bağlı)', ornek: 'Daha çok mizahi olsun, ama tasarruf konusunda ciddi' },
+    ],
+  },
+];
+
+export const OZEL_SECTIONS = [
+  {
+    id: 'ozel', baslik: 'Kendi karakterin', ikon: '🎭', aciklama: 'Hayal ettiğin karakteri serbestçe anlat.',
+    sorular: [
+      { id: 'karakter_ad', tip: 'text', soru: 'Karakterin adı', ornek: 'Kaptan Kuruş, Bilge Baykuş', zorunlu: true },
+      { id: 'tarif', tip: 'textarea', satir: 6, soru: 'Nasıl biri, nasıl konuşur, sana nasıl davranır?', ornek: 'Emekli bir korsan; her harcamayı hazine kaybı sayar, denizci ağzıyla konuşur…', zorunlu: true },
+      { id: 'ad', tip: 'text', soru: 'Senin adın ne?', ornek: 'Deniz' },
+      { id: 'hitap', tip: 'text', soru: 'Sana nasıl seslensin?', ornek: 'tayfa, miço' },
+      SERTLIK_SORU, UZUNLUK_SORU,
+    ],
+  },
+];
+
+const ORTAK_TAVIR = (a) => join([
+  `- ${SERTLIK[a.sertlik] || SERTLIK[3]}`,
+  '- Kullanıcının mal varlığını, gelir-giderini, borçlarını ve hedefini bilirsin; bunlar hakkında somut, uygulanabilir yorum ve öneri yaparsın.',
+  '- Birikimden para çekmek ya da birikimden harcamak hedefe zarar verir; bunu söylemekten çekinme ama aşağılama.',
+  `- ${UZUNLUK[a.uzunluk] || UZUNLUK['Kısa, mesajlaşır gibi']}`,
+]);
+
+export function buildTanidik(a) {
+  const ad = (a.karakter_ad || 'Karakter').trim(), kim = (a.ad || 'kullanıcı').trim();
+  const emoji = [].concat(a.emojiler || []).filter(e => e !== 'Kullanmaz');
+  return [
+    `Sen ${ad}sın: ${kim} adlı kullanıcının ${String(a.iliski || 'yakını').toLocaleLowerCase('tr')}. "Dudestreet" adlı kişisel finans uygulamasının içinden onunla yazışıyorsun ve parasını, birikimini, harcamalarını onunla birlikte takip ediyorsun.`,
+    '\nKİM OLDUĞUN',
+    join([line('Kişiliğin: ', a.kisilik), line('Parayla ilişkin ve nasihatlerin: ', a.para_tavri)]),
+    '\nKONUŞMA DİLİN (çok önemli, birebir uygula)',
+    join([
+      has(a.hitap) ? `- ${kim}'e şöyle seslenirsin: ${a.hitap.trim()}. Bir mesajda 1-2 hitap yeter.` : `- ${kim}'e adıyla seslenirsin.`,
+      line('Sık kullandığın sözler (doğal dağıt, her cümlede değil): ', a.sozler),
+      line('Kızınca: ', a.kizinca), line('Sevinince / aferin derken: ', a.sevinince),
+      emoji.length ? `- Emoji kullanırsın ama az: ${emoji.join('')}` : '- Emoji kullanmazsın.',
+    ]),
+    has(a.ornek_cevap) ? `\nÖRNEK CEVABIN (tarzını yakala, kelimesi kelimesine kopyalama)\n"${a.ornek_cevap.trim()}"` : '',
+    '\nTAVRIN', ORTAK_TAVIR(a),
+    has(a.kirmizi_cizgi) ? `\nKIRMIZI ÇİZGİLER (asla)\n- ${a.kirmizi_cizgi.trim()}` : '',
+  ].filter(Boolean).join('\n');
+}
+export function buildOzel(a) {
+  const ad = (a.karakter_ad || 'Karakter').trim(), kim = (a.ad || 'kullanıcı').trim();
+  return [
+    `Sen ${ad}sın. "Dudestreet" adlı kişisel finans uygulamasının içinden ${kim} ile yazışıyor, onun parasını, birikimini ve harcamalarını birlikte takip ediyorsun.`,
+    '\nKARAKTERİN', a.tarif?.trim() || '',
+    '\nKONUŞMA', join([has(a.hitap) ? `- ${kim}'e şöyle seslenirsin: ${a.hitap.trim()}.` : '']),
+    '\nTAVRIN', ORTAK_TAVIR(a),
+  ].filter(Boolean).join('\n');
+}
+// Ünlü karakter: kişilik metnini Gemini yazar (bu talimatla)
+export function unluIstek(a) {
+  return `Bir kişisel finans uygulamasında, kullanıcının sohbet edeceği bir yapay zekâ karakteri için SİSTEM TALİMATI (system prompt) yaz.
+Karakter, "${a.karakter_ad}" adlı ünlü kişinin kamuoyunca bilinen tarzından, üslubundan ve dünya görüşünden ESİNLENEN bir karakter. Gerçek kişi olduğunu iddia etmeyecek; ona gerçekte söylemediği sözler, uydurma olaylar ya da özel hayat bilgileri yüklenmeyecek. Tanınan konuşma tarzı, bilinen genel düşünceleri ve mizahı yakalanacak.
+Kullanıcının adı: ${a.ad || 'kullanıcı'}. Karakter ona şöyle seslenir: ${a.hitap || 'adıyla'}. Kullanıcı için rolü: ${a.rol || 'finans koçu'}.
+Sertlik (1 şefkatli – 5 acımasız koç): ${a.sertlik || 3}. Mesaj uzunluğu: ${a.uzunluk || 'Kısa, mesajlaşır gibi'}.
+${a.ek ? 'Kullanıcının isteği: ' + a.ek : ''}
+Talimat Türkçe olsun ve şu başlıkları içersin: KİM OLDUĞUN, KONUŞMA DİLİN (sık kullandığı tarz ve ifade biçimleri; birebir alıntı uydurma), PARA VE BİRİKİM KONUSUNDA TAVRIN, KIRMIZI ÇİZGİLER.
+Karakter kullanıcının mal varlığını, gelir-giderini, borçlarını ve hedefini bilir ve bunlar hakkında somut öneri yapar; kesin yatırım tavsiyesi vermez.
+Sadece talimat metnini döndür; açıklama, giriş cümlesi ya da kod bloğu ekleme.`;
+}
