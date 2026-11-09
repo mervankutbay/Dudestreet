@@ -53,7 +53,7 @@ export async function yedekPenceresi() {
     <div class="ust-etiket" style="margin-top:16px">Yedekten geri yükle</div>
     <div id="yListe" class="mini">Yedekler yükleniyor…</div>`, { genis: true });
   $('#kapat', el).onclick = () => el.remove();
-  $('#yOto', el).onchange = e => { lsSet('ds_otomatikYedek', e.target.checked); toast(e.target.checked ? 'Günlük yedek açık 🛟' : 'Günlük yedek kapalı'); };
+  $('#yOto', el).onchange = e => { lsSet('ds_otomatikYedek', e.target.checked); };
   const ciz = async () => {
     let l = [];
     try { l = isDemo() ? demoListe() : await G.listBackups(); } catch (e) { $('#yListe', el).textContent = 'Yedekler alınamadı: ' + e.message; return; }

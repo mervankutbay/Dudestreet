@@ -185,7 +185,7 @@ export function renderPersona() {
     </div>`;
   $('#sohbeteDon').onclick = () => S.go('dude');
   $('#kYeni').onclick = () => karakterTipiSec(false);
-  $$('[data-sec]').forEach(b => b.onclick = () => guard(async () => { await karakterleriYaz(karakterler(), b.dataset.sec); S.chat = sohbetOku(aktifKarakter()); toast(`${esc(aktifKarakter().ikon)} ${esc(aktifKarakter().ad)} ile konuşuyorsun`); S.go('dude'); }));
+  $$('[data-sec]').forEach(b => b.onclick = () => guard(async () => { await karakterleriYaz(karakterler(), b.dataset.sec); S.chat = sohbetOku(aktifKarakter()); S.go('dude'); }));
   if (k) {
     $('#kIkon').onclick = () => { const s = sheet(`<h3>Simge seç</h3><div class="emo-izgara">${IKONLAR.map(e => `<button type="button" data-e="${e}">${e}</button>`).join('')}</div>`); $$('[data-e]', s).forEach(x => x.onclick = () => { s.remove(); kaydet({ ikon: x.dataset.e }); }); };
     $('#kaydet').onclick = () => kaydet({ ad: $('#kAd').value.trim() || k.ad, prompt: $('#prompt').value, kaynak: $('#prompt').value !== k.prompt ? 'elle' : k.kaynak });
@@ -317,7 +317,7 @@ function karakterMenu() {
     <ul class="liste">${l.map(x => `<li class="tikla" data-k="${x.id}"><span class="kayit-ik karakter-ik">${esc(x.ikon)}</span><span class="bosluk"><b>${esc(x.ad)}</b><div class="mini">${esc(TIPLER.find(t => t.tip === x.tip)?.ad || '')}</div></span>${x.id === k.id ? `<span class="vurgu">${ic('tik', 18)}</span>` : ''}</li>`).join('')}</ul>
     <div class="satir"><button class="ikinci bosluk" id="mYeni">${ic('arti', 16)} Yeni karakter</button><button class="ikinci bosluk" id="mKisilik">🧬 Kişilik ve hafıza</button></div>`);
   $('#kapat', s).onclick = () => s.remove();
-  $$('[data-k]', s).forEach(li => li.onclick = () => guard(async () => { s.remove(); if (li.dataset.k === k.id) return; await karakterleriYaz(karakterler(), li.dataset.k); S.chatKimin = null; toast(`${esc(aktifKarakter().ikon)} ${esc(aktifKarakter().ad)} ile konuşuyorsun`); renderDude(); }));
+  $$('[data-k]', s).forEach(li => li.onclick = () => guard(async () => { s.remove(); if (li.dataset.k === k.id) return; await karakterleriYaz(karakterler(), li.dataset.k); S.chatKimin = null; renderDude(); }));
   $('#mYeni', s).onclick = () => { s.remove(); karakterTipiSec(false); };
   $('#mKisilik', s).onclick = () => { s.remove(); S.go('persona'); };
 }

@@ -245,7 +245,7 @@ export function notlarAc() {
       <button class="blok tehlike" id="mSil">${ic('cop')} Sil</button>`);
     if ($('#mKapat', s)) $('#mKapat', s).onclick = () => { s.remove(); bitir(n); kapat(); };
     $('#mAd', s).onclick = () => { s.remove(); adDegistir(n, editorde ? () => git('not', n.id) : null); };
-    $('#mSabit', s).onclick = () => { yerel(n, { sabit: !n.sabit }); yama(n.id, { sabit: n.sabit }); s.remove(); if (!editorde) ciz(); toast(n.sabit ? 'Sabitlendi 📌' : 'Sabitleme kalktı'); };
+    $('#mSabit', s).onclick = () => { yerel(n, { sabit: !n.sabit }); yama(n.id, { sabit: n.sabit }); s.remove(); if (!editorde) ciz(); };
     $('#mSil', s).onclick = () => { s.remove(); notSil(n); };
   }
   const bitir = n => { if (n && !n.metin.trim() && !planListe(n.id).length) { nb.notlar = nb.notlar.filter(x => x.id !== n.id); senk(); yama(n.id, { sil: true }); } };

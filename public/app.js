@@ -89,13 +89,12 @@ const GOZ_KAPALI = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18
 function ustAraclar() {
   const g = $('#btnGizle'), p = $('#btnPara');
   const ciz = () => { g.innerHTML = gizli() ? GOZ_KAPALI : GOZ_ACIK; g.classList.toggle('on', gizli()); g.setAttribute('aria-label', gizli() ? 'Tutarları göster' : 'Tutarları gizle'); p.textContent = gosterSimge(); };
-  g.onclick = () => { lsSet('ds_gizli', !gizli()); ciz(); S.yenile(); toast(gizli() ? '🙈 Tutarlar gizlendi' : '👀 Tutarlar görünüyor'); };
+  g.onclick = () => { lsSet('ds_gizli', !gizli()); ciz(); S.yenile(); };
   p.onclick = () => {
     const ana = paraKod(), sira = [ana, ...['TRY', 'EUR', 'USD'].filter(k => k !== ana && S.kurlar[k] > 0)];
     if (sira.length < 2) return toast('Kurlar henüz gelmedi, birazdan tekrar dene');
     const yeni = sira[(sira.indexOf(gosterKod()) + 1) % sira.length];
     lsSet('ds_gosterPara', yeni); ciz(); S.yenile();
-    toast(yeni === ana ? `💱 Ana para birimi (${gosterSimge()})` : `💱 Tutarlar ${gosterSimge()} cinsinden (1 ${gosterSimge()} = ${fmt(S.kurlar[yeni], 2)} ${pb()})`);
   };
   S.ustCiz = ciz; ciz();
 }
@@ -324,7 +323,7 @@ function renderAyarlar() {
     </div>
     <button class="tehlike blok" id="cikis">${isDemo() ? 'Demodan çık (demo verileri silinir)' : 'Bu cihazda bağlantıyı kes'}</button>
     ${isDemo() ? '' : '<p class="mini ortala" style="margin:0">Bağlantıyı kesmek tablonu silmez; tekrar Google ile girince kaldığın yerden devam edersin.</p>'}`;
-  $$('.tema-sec').forEach(b => b.onclick = () => { const t = temaUygula(b.dataset.tema); renderAyarlar(); toast(`🎨 ${esc(t.ad)} teması`); });
+  $$('.tema-sec').forEach(b => b.onclick = () => { const t = temaUygula(b.dataset.tema); renderAyarlar(); });
   $('#hDuz').onclick = hedefDuzenle;
   if ($('#kisilik')) $('#kisilik').onclick = () => go('persona');
   $('#degis').onclick = () => wizard('gemini');
