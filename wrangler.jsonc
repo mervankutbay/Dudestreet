@@ -1,0 +1,13 @@
+{
+  // Dudestreet — Cloudflare Worker (statik site + fiyat servisi). Kullanıcı verisi tutmaz.
+  "name": "dudestreet",
+  "main": "src/worker.js",
+  "compatibility_date": "2025-09-01",
+  // Panelden eklenen GOOGLE_CLIENT_ID her güncellemede silinmesin
+  "keep_vars": true,
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  }
+}

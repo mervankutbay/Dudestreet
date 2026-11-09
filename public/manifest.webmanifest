@@ -1,0 +1,16 @@
+{
+  "name": "Dudestreet",
+  "short_name": "Dudestreet",
+  "description": "Kendi Wall Street'in. Birikimini ve portföyünü takip et; Future Dude yanında. Verin kendi Google Drive'ında.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#050a07",
+  "theme_color": "#050a07",
+  "lang": "tr",
+  "icons": [
+    { "src": "img/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "img/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
