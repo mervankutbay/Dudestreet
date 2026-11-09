@@ -3,7 +3,7 @@
 export const CONFIG = {
   GOOGLE_CLIENT_ID: '',
   APP_NAME: 'Dudestreet',
-  APP_VERSION: 'v3',
+  APP_VERSION: 'v4',
   // Uygulamanın beklediği tablo (şema) sürümü. Yeni migration ekleyince artır.
   SCHEMA_VERSION: 3,
   // Kullanıcının Drive'ında tabloyu tanımak için kullanılan etiket
