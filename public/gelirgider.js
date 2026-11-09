@@ -1,7 +1,7 @@
 // Dudestreet — Gelir-Gider (Nébula'daki sistemin aynısı): ay ay gelir, temel giderler (✓ onay), ek giderler, birikim, rapor
 import { S, $, $$, esc, num, money, fmt, today, buAy, ymOf, ymAdd, ymAdi, tarihFmt, uid, toast, sheet, onayKutusu, guard, ekle, sil, guncelle, chips, chipBagla, chipVal, tutarAlan, fmtIn, ikon, pick, kapatBtn, lsGet, lsSet, evet, girdi } from './core.js';
 import { ayHesap, butceAy, butceGruplari, butceIkon, temelOnayli, onayKaydi, onayBasla, ilkAy, birlesikKat, katAd, katIkon, kalemIkon, kalemSerbest, katSilindiMi, katKayit, katBekleyen, katBekleYaz, katAnahtar, KAT_KORUMALI, EMOJI_LISTE, BUTCE_KAT, GIDER_KAT } from './hesap.js';
-import { planListe, planYaz, planOku, planOnayla, bekleyenToplam, onayDegistir, butceAyYaz, giderEkle, giderSil } from './plan.js';
+import { planListe, planYaz, planOku, planOnayla, bekleyenToplam, onayDegistir, butceAyYaz, giderEkle, giderSil, giderGuncelle } from './plan.js';
 
 const app = () => $('#app');
 const ic = (k, s = 16) => ikon(k, 'currentColor', s);
@@ -254,7 +254,7 @@ export function renderGelirGider() {
   if (seg === 'gider') katCipBagla(v, 'ggKat', () => katYenile(v, 'ggKat'));
   raporBagla(v);
   $$('[data-ted]', v).forEach(b => b.onclick = () => { const i = Number(b.dataset.ted); if (h.temel[i]) temelDuzenle(ym, i); });
-  $$('[data-ged]', v).forEach(b => b.onclick = () => { const g = h.giderler.find(x => x['Kimlik'] === b.dataset.ged); if (g) kalemDuzenle({ baslik: 'Harcamayı düzenle', ad: g['Kalem'] || g['Kategori'], kategori: g['Kategori'], tutar: num(g['Tutar']), tutarKilit: evet(g['Birikimden']) ? 'Birikimden ödendiği için tutar burada değişmez. Tutar yanlışsa silip yeniden ekle.' : '', kaydet: ({ ad, kategori, tutar }) => guncelle('Giderler', g['Kimlik'], { Kalem: ad, Kategori: kategori, Tutar: String(tutar), 'İkon': kategori === g['Kategori'] ? g['İkon'] : katIkon(kategori) }) }); });
+  $$('[data-ged]', v).forEach(b => b.onclick = () => { const g = h.giderler.find(x => x['Kimlik'] === b.dataset.ged); if (g) kalemDuzenle({ baslik: 'Harcamayı düzenle', ad: g['Kalem'] || g['Kategori'], kategori: g['Kategori'], tutar: num(g['Tutar']), tutarKilit: evet(g['Birikimden']) ? 'Birikimden ödendiği için tutar burada değişmez. Tutar yanlışsa silip yeniden ekle.' : '', kaydet: ({ ad, kategori, tutar }) => giderGuncelle(g, { Kalem: ad, Kategori: kategori, Tutar: String(tutar), 'İkon': kategori === g['Kategori'] ? g['İkon'] : katIkon(kategori) }) }); });
   $$('[data-gped]', v).forEach(b => b.onclick = () => { const p = planListe().find(x => x.id === b.dataset.gped); if (p) kalemDuzenle({ baslik: 'Planı düzenle', ad: p.ad, kategori: p.kategori || 'Diğer', tutar: p.tutar, kaydet: async ({ ad, kategori, tutar }) => { planYaz(planOku().map(x => x.id === p.id ? { ...x, ad, kategori, tutar } : x)); } }); });
   $$('[data-tonay]', v).forEach(b => b.onclick = () => { const k = b.dataset.tonay, pl = temelPlan(k); if (pl) return planOnayla(pl, renderGelirGider); b.disabled = true; b.classList.add('on'); guard(async () => { await onayDegistir(ym, k, true); renderGelirGider(); }); });
   $$('[data-tgeri]', v).forEach(b => b.onclick = () => { b.disabled = true; b.classList.remove('on'); guard(async () => { await onayDegistir(ym, b.dataset.tgeri, false); renderGelirGider(); }); });

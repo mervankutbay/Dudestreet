@@ -1,7 +1,8 @@
 // Dudestreet — yapay zekâ çekirdeği: karakterler, sistem talimatı (tüm uygulama verisi), sohbetten işlemler (onaylı), arka plan hafızası
 import { S, num, moneyHam as M, fmt, today, buAy, ymAdi, ymAdd, uid, lsGet, lsSet, evet, ekle, guncelle, sil, tazele, trFold } from './core.js';
 import { malVarligi, hedefHesap, ayHesap, borclar, varliklar, butceAy, temelOnayli, birlesikKat, katAd, turBilgi, VARLIK_TURLERI, sonrakiGun } from './hesap.js';
-import { giderEkle, giderSil, butceAyYaz, onayDegistir, planListe } from './plan.js';
+import { giderEkle, giderSil, butceAyYaz, onayDegistir, planListe, kayitSil, varlikKaldir, borcSil } from './plan.js';
+import { buildPersona } from './persona.js';
 import * as AI from './gemini.js';
 
 // ---------- Karakterler (Persona sekmesinde "karakterler" ve "aktif" anahtarlarında JSON) ----------
@@ -14,6 +15,12 @@ export function karakterler() {
   return l;
 }
 export const aktifKarakter = () => { const l = karakterler(); return l.find(k => k.id === S.persona.aktif) || l[0] || null; };
+// "Gelecekteki ben" karakterleri hedefi kişilik metninde de bilir: hedef değişince anketten üretilmişler yeniden üretilir
+export async function benKarakterleriniGuncelle() {
+  const l = karakterler(); let degisti = false;
+  l.forEach(k => { if (k.tip === 'ben' && k.kaynak === 'anket' && k.cevaplar) { k.prompt = buildPersona({ ...k.cevaplar, ...S.ayar }); degisti = true; } });
+  if (degisti) await karakterleriYaz(l);
+}
 export async function karakterleriYaz(l, aktif) {
   S._karakterler = l;
   const a = aktif ?? (l.find(k => k.id === S.persona.aktif) ? S.persona.aktif : l[0]?.id || '');
@@ -199,8 +206,13 @@ export async function islemUygula(o) {
     }
     case 'not_ekle': return ekle('Notlar', { Kimlik: 'n' + uid(), Metin: o.metin, 'Güncelleme': new Date().toISOString(), Sabit: '' });
     case 'hafiza': return ekle('Hafıza', { Tarih: today(), Not: o.not, Kaynak: 'Kullanıcı' });
-    case 'hedef': { const y = {}; if (o.hedef_ne) y.hedef_ne = o.hedef_ne; if (o.hedef_tutar) y.hedef_tutar = String(num(o.hedef_tutar)); if (o.aylik_min) y.aylik_min = String(num(o.aylik_min)); if (o.hedef_tarih) y.hedef_tarih = o.hedef_tarih; await S.db.setKV('Ayarlar', y); S.ayar = await S.db.kv('Ayarlar'); return; }
-    case 'sil': if (o.sekme === 'Giderler') { const g = bul(S.giderler, o.kimlik); return g ? giderSil(g) : null; } return sil(o.sekme, o.kimlik);
+    case 'hedef': { const y = {}; if (o.hedef_ne) y.hedef_ne = o.hedef_ne; if (o.hedef_tutar) y.hedef_tutar = String(num(o.hedef_tutar)); if (o.aylik_min) y.aylik_min = String(num(o.aylik_min)); if (o.hedef_tarih) y.hedef_tarih = o.hedef_tarih; await S.db.setKV('Ayarlar', y); S.ayar = await S.db.kv('Ayarlar'); return benKarakterleriniGuncelle(); }
+    case 'sil':   // arayüzdeki silmeyle aynı: bağlı kayıtlar da birlikte gider
+      if (o.sekme === 'Giderler') { const g = bul(S.giderler, o.kimlik); return g ? giderSil(g) : null; }
+      if (o.sekme === 'Kayıtlar') return kayitSil(o.kimlik);
+      if (o.sekme === 'Portföy') return varlikKaldir(o.kimlik);
+      if (o.sekme === 'Borçlar') return borcSil(o.kimlik);
+      return sil(o.sekme, o.kimlik);
   }
 }
 

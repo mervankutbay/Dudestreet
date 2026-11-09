@@ -1,7 +1,7 @@
 // Dudestreet — Hedef: aylık birikim hedefi, birikim hesabı (yatır/çek), hedefe bağlı varlıklar
-import { S, $, $$, esc, num, money, fmt, today, buAy, ymOf, uid, toast, sheet, onayKutusu, guard, ekle, sil, ikon, pick, tutarAlan, fmtIn, kapatBtn, tarihFmt, ayKisa, girdi } from './core.js';
+import { S, $, $$, esc, num, money, fmt, today, buAy, ymOf, uid, toast, sheet, onayKutusu, guard, ekle, ikon, pick, tutarAlan, fmtIn, kapatBtn, tarihFmt, ayKisa, girdi } from './core.js';
 import { hedefHesap, varliklar, SAYILAN, NAKIT } from './hesap.js';
-import { buildPersona } from './persona.js';
+import { kayitSil } from './plan.js';
 import { varlikDetay } from './varliklar.js';
 
 const ic = (k, s = 18) => ikon(k, 'currentColor', s);
@@ -10,10 +10,12 @@ export const HEDEFLER = [['ev', 'Ev'], ['araba', 'Araba'], ['ucak', 'Seyahat'], 
 // Hedef formu: kurulumda sayfa olarak, sonra pencere olarak açılır
 export function hedefFormHTML(ust = '') {
   const a = S.ayar, tur = a.hedef_tur || 'ev', para = a.para_birimi || '₺';
+  // Kayıt varken ana para birimi değiştirilemez: tutarlar çevrilmeden başka birime geçmiş olurdu
+  const veriVar = [S.gelir, S.giderler, S.kayitlar, S.portfoy, S.borclar, S.butce].some(t => (t || []).length);
   return `${ust}
     <div class="hedef-izgara" id="hTur">${HEDEFLER.map(([k, t]) => `<button type="button" data-k="${k}" class="${k === tur ? 'on' : ''}">${ikon(k, 'currentColor', 24)}${t}</button>`).join('')}</div>
     <div id="ozelKutu" class="${tur === 'hedef' ? '' : 'hidden'}"><label class="etiket" for="hOzel">Hedefin ne?</label><input id="hOzel" value="${esc(tur === 'hedef' ? a.hedef_ne || '' : '')}" placeholder="ör. Kendi işimi kurmak"></div>
-    <div><span class="etiket">Para birimi</span><div class="seg" id="hPara">${['₺', '€', '$', '£'].map(p => `<button type="button" data-p="${p}" class="${p === para ? 'on' : ''}">${p} ${{ '₺': 'TL', '€': 'Euro', '$': 'Dolar', '£': 'Sterlin' }[p]}</button>`).join('')}</div></div>
+    ${veriVar ? `<div><span class="etiket">Para birimi</span><p class="mini" style="margin:4px 0 0">Ana para birimin <b>${para}</b>. Kayıtlı tutarların hepsi bu birimde durduğu için sonradan değişmez (değişse 65.000 ₺ birden 65.000 € olurdu). Tutarları başka birimde görmek için üstteki <b>${para}</b> düğmesine bas.</p></div>` : `<div><span class="etiket">Para birimi</span><div class="seg" id="hPara">${['₺', '€', '$', '£'].map(p => `<button type="button" data-p="${p}" class="${p === para ? 'on' : ''}">${p} ${{ '₺': 'TL', '€': 'Euro', '$': 'Dolar', '£': 'Sterlin' }[p]}</button>`).join('')}</div></div>`}
     <div><label class="etiket" for="hTutar">Hedef tutar</label><div class="alan-ek"><input id="hTutar" inputmode="decimal" value="${esc(fmtIn(a.hedef_tutar))}" placeholder="ör. 1.500.000"><span class="pbe">${para}</span></div></div>
     <div class="iki">
       <div><label class="etiket" for="hMin">Her ay en az</label><div class="alan-ek"><input id="hMin" inputmode="decimal" value="${esc(fmtIn(a.aylik_min))}" placeholder="ör. 10.000"><span class="pbe">${para}</span></div></div>
@@ -32,11 +34,7 @@ export function hedefFormBagla(kok, { bitti, zorunlu = false }) {
     const paraDegisti = para !== (S.ayar.para_birimi || '₺');
     await S.db.setKV('Ayarlar', { hedef_ne: ne, hedef_tur: tur, hedef_tutar: String(tutar || ''), aylik_min: String(girdi($('#hMin', kok).value) || ''), para_birimi: para, hedef_tarih: $('#hTarih', kok).value || '' });
     S.ayar = await S.db.kv('Ayarlar');
-    // "Gelecekteki ben" karakterleri hedefi kişilik metninde de bilir: anketten üretilmişlerse yeni hedefle yeniden üretilir
-    const { karakterler, karakterleriYaz } = await import('./ai.js');
-    const l = karakterler(); let degisti = false;
-    l.forEach(k => { if (k.tip === 'ben' && k.kaynak === 'anket' && k.cevaplar) { k.prompt = buildPersona({ ...k.cevaplar, ...S.ayar }); degisti = true; } });
-    if (degisti) await karakterleriYaz(l);
+    await (await import('./ai.js')).benKarakterleriniGuncelle();
     if (paraDegisti) S.fiyat = { para: '', fiyatlar: {}, zaman: null, hata: null };
     bitti?.(paraDegisti);
   };
@@ -98,7 +96,7 @@ export function renderHedef() {
     $('#kapat', el).onclick = () => el.remove();
     $$('[data-b]', el).forEach(li => li.onclick = () => guard(async () => { const { guncelle } = await import('./core.js'); await guncelle('Portföy', li.dataset.b, { Hedef: 'evet' }); el.remove(); toast('🎯 Hedefine eklendi'); renderHedef(); }));
   };
-  $$('[data-ksil]').forEach(b => b.onclick = () => onayKutusu('Kaydı sil?', 'Tablondan da silinir.', () => guard(async () => { await sil('Kayıtlar', b.dataset.ksil); toast('🗑️ Silindi'); renderHedef(); }), { evetYazi: 'Sil', tehlike: true }));
+  $$('[data-ksil]').forEach(b => b.onclick = () => onayKutusu('Kaydı sil?', 'Tablondan da silinir.', () => guard(async () => { await kayitSil(b.dataset.ksil); toast('🗑️ Silindi'); renderHedef(); }), { evetYazi: 'Sil', tehlike: true }));
   $('#kTutar').onkeydown = e => { if (e.key === 'Enter') $('#kEkle').click(); };
   $('#kEkle').onclick = () => guard(async () => {
     const tutar = girdi($('#kTutar').value);

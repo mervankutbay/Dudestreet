@@ -1,5 +1,5 @@
 // Dudestreet — notlardan çıkan "planlanan harcamalar" listesi (Nébula'daki gibi bu cihazda tutulur) ve onaylama
-import { S, $, esc, num, money, gunluk, today, buAy, ymOf, uid, lsGet, lsSet, toast, sheet, onayKutusu, guard, ekle, sil, tazele, pick, tutarAlan, fmtIn, chips, chipBagla, chipVal, girdi } from './core.js';
+import { S, $, esc, num, money, gunluk, today, buAy, ymOf, uid, lsGet, lsSet, toast, sheet, onayKutusu, guard, ekle, sil, guncelle, tazele, pick, tutarAlan, fmtIn, chips, chipBagla, chipVal, girdi } from './core.js';
 import { butceAy, butceGruplari, temelOnayli, onayKaydi, katIkon, varliklar, fiyatAnahtar } from './hesap.js';
 
 const PLAN_LS = 'ds_plan';
@@ -54,6 +54,34 @@ export async function giderSil(g) {
   if (evet2(g['Birikimden'])) { const h = S.kayitlar.find(r => r['Bağ'] === g['Kimlik']); if (h) await sil('Kayıtlar', h['Kimlik']); }
 }
 const evet2 = v => ['evet', 'true', '1'].includes(String(v || '').toLowerCase());
+// Gider düzenlenince birikimden ödendiyse bağlı birikim çıkışı da aynı adı/kategoriyi taşır
+export async function giderGuncelle(g, yeni) {
+  await guncelle('Giderler', g['Kimlik'], yeni);
+  if (evet2(g['Birikimden'])) {
+    const h = S.kayitlar.find(r => r['Bağ'] === g['Kimlik']);
+    if (h) await guncelle('Kayıtlar', h['Kimlik'], { ...(yeni.Kalem !== undefined ? { Not: yeni.Kalem } : {}), ...(yeni.Kategori !== undefined ? { Kategori: yeni.Kategori } : {}), ...(yeni.Tutar !== undefined ? { Tutar: yeni.Tutar } : {}) });
+  }
+}
+// Birikim kaydı silinirken bir gidere bağlıysa gider de silinir (ikisi birlikte yaşar)
+export async function kayitSil(kimlik) {
+  const r = S.kayitlar.find(x => x['Kimlik'] === kimlik); if (!r) return;
+  const g = r['Bağ'] && S.giderler.find(x => x['Kimlik'] === r['Bağ']);
+  if (g) return giderSil(g);
+  await sil('Kayıtlar', kimlik);
+}
+// Varlığı satış kaydı olmadan kaldır: bugünkü değeri "Varlık çıkışı" olarak yazılır (grafikte yatırım hariç çizgi zıplamasın)
+export async function varlikKaldir(kimlik) {
+  const x = varliklar().find(y => y.p['Kimlik'] === kimlik); if (!x) return;
+  await sil('Portföy', kimlik);
+  if (x.deger > 0) await ekle('Kayıtlar', { Kimlik: uid(), Tarih: today(), 'Tür': 'Varlık çıkışı', Tutar: String(Math.round(x.deger * 100) / 100), Kategori: x.p['Sembol'], Not: `${x.p['Ad'] || x.p['Sembol']} kaldırıldı` });
+}
+// Borcu hareket geçmişiyle birlikte sil
+export async function borcSil(kimlik) {
+  await sil('Borçlar', kimlik);
+  const hs = await S.db.table('Borç hareketleri'), satirlar = hs.filter(h => h['Borç'] === kimlik).map(h => h._row);
+  if (satirlar.length) { await S.db.deleteRows('Borç hareketleri', satirlar); gunluk('Silindi', 'Borç hareketleri', `${satirlar.length} hareket (silinen borçla birlikte)`); }
+  await tazele('Borç hareketleri');
+}
 
 // ---------- Onaylama ----------
 // Onaylanan satır hemen "Eklenen"e geçer; tabloya yazılamazsa bekleyenlere geri döner
@@ -99,6 +127,12 @@ export function planGeriAl(p, bitti) {
       if (k.tur === 'ek') { const g = S.giderler.find(x => x['Kimlik'] === k.gider); if (g) await giderSil(g); }
       else if (k.tur === 'temel' && k.onceki) { await butceAyYaz(k.ay, k.onceki); if (k.onay) await onayDegistir(k.ay, p.ad, false); }
       else if (k.tur === 'yok' && k.onay) await onayDegistir(k.ay, p.ad, false);
+      else if (k.tur === 'satis') {
+        if (!k.satis) throw new Error('bu satış eski sürümde kaydedildi; Varlıklar’dan düzelt');
+        if (k.gider) { const g = S.giderler.find(x => x['Kimlik'] === k.gider); if (g) await giderSil(g); }
+        await sil('Kayıtlar', k.satis);
+        if (k.portfoy) { if (S.portfoy.some(x => x['Kimlik'] === k.portfoy['Kimlik'])) await guncelle('Portföy', k.portfoy['Kimlik'], { Adet: k.portfoy['Adet'] }); else await ekle('Portföy', k.portfoy); }
+      }
       bitti?.();
     } catch (e) { planYaz(planOku().map(x => x.id === p.id ? orijinal : x)); bitti?.(); toast('Geri alınamadı: ' + esc(e.message)); }
   });
@@ -124,12 +158,13 @@ function satisSheet(p, bitti) {
     if (!(h.t > 0) || !(h.adet > 0)) { toast('Tutarı gir'); return; }
     el.remove();
     optimist(p, { tur: 'satis', tarih: today() }, async () => {
-      const kalan = h.x.adet - h.adet, x = h.x.p;
-      const guncel = await S.db.table('Portföy'), r = guncel.find(y => y['Kimlik'] === x['Kimlik']);
-      if (r) { if (kalan > 1e-9) { const { _row, ...o } = r; await S.db.writeObj('Portföy', _row, { ...o, Adet: String(Number(kalan.toPrecision(10))) }); } else await S.db.deleteRow('Portföy', r._row); }
-      await tazele('Portföy');
-      await ekle('Kayıtlar', { Kimlik: uid(), Tarih: today(), 'Tür': 'Varlık satışı', Tutar: String(h.t), Kategori: x['Sembol'], Not: `${x['Ad'] || x['Sembol']} satıldı` });
-      if (harca) await ekle('Kayıtlar', { Kimlik: uid(), Tarih: today(), 'Tür': 'Harcama', Tutar: String(h.t), Kategori: 'Varlık satışı', Not: p.ad });
+      const kalan = h.x.adet - h.adet, x = h.x.p, { _row, ...once } = x;
+      if (kalan > 1e-9) await guncelle('Portföy', x['Kimlik'], { Adet: String(Number(kalan.toPrecision(10))) }); else await sil('Portföy', x['Kimlik']);
+      const sk = uid();
+      await ekle('Kayıtlar', { Kimlik: sk, Tarih: today(), 'Tür': 'Varlık satışı', Tutar: String(h.t), Kategori: x['Sembol'], Not: `${x['Ad'] || x['Sembol']} satıldı` });
+      // Satıp harcadıysa: Gelir-Gider'de "birikimden ödenen" gider olarak da görünür (bağlı birikim çıkışıyla birlikte)
+      const gk = harca ? await giderEkle({ tarih: today(), kalem: p.ad, kategori: 'Diğer', tutar: h.t, birikimden: true }) : null;
+      planYaz(planOku().map(y => y.id === p.id ? { ...y, kayit: { ...y.kayit, portfoy: once, satis: sk, gider: gk } } : y));
       toast(harca ? pick(['😤 Satıp harcadın, Future Dude not aldı.', '💸 Satış kaydedildi, bu ayın birikiminden düştü.']) : '🏦 Satış kaydedildi, para birikimde.');
     }, bitti);
   };

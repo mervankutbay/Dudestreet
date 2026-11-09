@@ -1,7 +1,7 @@
 // Dudestreet — Borçlar: kredi kartları (limit, borç, asgari, hesap kesim ve son ödeme günü), krediler, kişilere borçlar
 import { S, $, $$, esc, num, money, fmt, today, uid, toast, sheet, onayKutusu, guard, ekle, guncelle, sil, tazele, ikon, pick, tutarAlan, fmtIn, kapatBtn, tarihFmt, gunFark, girdi } from './core.js';
 import { borclar } from './hesap.js';
-import { giderEkle } from './plan.js';
+import { giderEkle, borcSil } from './plan.js';
 
 const ic = (k, s = 18) => ikon(k, 'currentColor', s);
 const TURLER = [['Kredi kartı', '💳'], ['Kredi', '🏦'], ['Kişiye borç', '🤝'], ['Diğer', '🧾']];
@@ -100,10 +100,7 @@ function borcDetay(kimlik) {
   }); };
   $('#dDuz', el).onclick = () => { el.remove(); borcForm(b); };
   $('#dSil', el).onclick = () => onayKutusu(`${b['Ad']} silinsin mi?`, 'Hareket geçmişi de silinir.', () => islem(async () => {
-    await sil('Borçlar', kimlik);
-    const hs = await S.db.table('Borç hareketleri'), satirlar = hs.filter(h => h['Borç'] === kimlik).map(h => h._row);
-    if (satirlar.length) await S.db.deleteRows('Borç hareketleri', satirlar);
-    await tazele('Borç hareketleri'); toast('🗑️ Silindi');
+    await borcSil(kimlik); toast('🗑️ Silindi');
   }), { evetYazi: 'Sil', tehlike: true });
 }
 export { gunFark };
