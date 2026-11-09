@@ -1,5 +1,6 @@
 // Dudestreet — ortak çekirdek: durum, yardımcılar, tablo erişimi, pencereler
 import { CONFIG } from './config.js';
+import { eklenenSatir } from './google.js';
 
 export const $ = (s, el = document) => el.querySelector(s);
 export const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -220,7 +221,7 @@ export function onayKutusu(baslik, metin, evetFn, { evetYazi = 'Evet', tehlike =
 }
 
 export async function guard(fn) {
-  try { return await fn(); }
+  try { if (S.tazeBekle) await S.tazeBekle.catch(() => {}); return await fn(); }   // önbellekle açıldıysa yazmadan önce taze veri beklenir
   catch (e) {
     console.error(e);
     if (e && e.name === 'AuthError') { S.yenidenBaglan?.(); return; }
@@ -245,9 +246,37 @@ export const TABLOLAR = {
 };
 export async function tazele(...sekmeler) {
   const l = await Promise.all(sekmeler.map(t => S.db.table(t)));
-  sekmeler.forEach((t, i) => { S[TABLOLAR[t]] = l[i]; });
-  if (sekmeler.includes('Portföy')) S.portfoy = S.portfoy.filter(p => num(p['Adet']) > 0);
+  sekmeler.forEach((t, i) => tabloKoy(t, l[i]));
 }
+function tabloKoy(sekme, liste) {
+  S[TABLOLAR[sekme]] = sekme === 'Portföy' ? liste.filter(p => num(p['Adet']) > 0) : liste;
+  onbellekYaz();
+}
+// Hız: yazdıktan sonra tabloyu baştan okumak yerine eldeki listeyi günceller (Sheets'e giden istek sayısı yarıya iner)
+async function yerelEkle(sekme, objs, cevap) {
+  const ilk = eklenenSatir(cevap);
+  if (!ilk || !TABLOLAR[sekme]) return tazele(sekme);
+  const head = await S.db.head(sekme), simdiki = S[TABLOLAR[sekme]] || [];
+  const yeni = objs.map((o, i) => { const r = { _row: ilk + i }; head.forEach(h => { r[h] = o[h] === undefined || o[h] === null ? '' : String(o[h]); }); return r; });
+  tabloKoy(sekme, [...simdiki.filter(r => r._row < ilk), ...yeni]);
+}
+
+// ---------- Yerel önbellek: uygulama açılır açılmaz son verilerle çizilir, taze veri arkadan gelir (Nébula gibi) ----------
+const ONBELLEK = 'ds_onbellek';
+let onbellekZaman = null;
+export function onbellekYaz() {
+  if (!S.db || S.db.id === 'demo' || !S.ayar) return;
+  clearTimeout(onbellekZaman);
+  onbellekZaman = setTimeout(() => {
+    try {
+      const veri = { id: S.db.id, zaman: Date.now(), meta: S.meta, ayar: S.ayar, persona: S.persona };
+      Object.values(TABLOLAR).forEach(a => { if (a !== 'gunlukler') veri[a] = S[a]; });
+      localStorage.setItem(ONBELLEK, JSON.stringify(veri));
+    } catch { /* yer yoksa önbelleksiz devam */ }
+  }, 400);
+}
+export function onbellekOku(id) { try { const v = JSON.parse(localStorage.getItem(ONBELLEK) || 'null'); return v && v.id === id ? v : null; } catch { return null; } }
+export const onbellekSil = () => localStorage.removeItem(ONBELLEK);
 // ---------- Değişiklik günlüğü (Günlük sekmesi): arka planda yazılır, işlemi bekletmez ----------
 const GUNLUKSUZ = new Set(['Geçmiş', 'Notlar', 'Günlük']);
 const ozetle = o => Object.entries(o || {}).filter(([k, v]) => !['Kimlik', '_row', 'İkon', 'Bağ'].includes(k) && v !== '' && v !== undefined).map(([k, v]) => `${k}: ${v}`).join(' · ').slice(0, 300);
@@ -257,26 +286,29 @@ export function gunluk(islem, sekme, ozet, eski = '') {
   const satir = { Zaman: new Date().toISOString(), 'İşlem': islem, Sekme: sekme, 'Özet': String(ozet).slice(0, 300), Eski: String(eski).slice(0, 300) };
   gunlukKuyruk = gunlukKuyruk.then(() => S.db.appendObj('Günlük', satir)).catch(() => {});
 }
-export async function ekle(sekme, obj) { await S.db.appendObj(sekme, obj); gunluk('Eklendi', sekme, ozetle(obj)); await tazele(sekme); }
-export async function ekleCok(sekme, objs) { await S.db.appendObjs(sekme, objs); objs.forEach(o => gunluk('Eklendi', sekme, ozetle(o))); await tazele(sekme); }
+export async function ekle(sekme, obj) { const c = await S.db.appendObj(sekme, obj); gunluk('Eklendi', sekme, ozetle(obj)); await yerelEkle(sekme, [obj], c); }
+export async function ekleCok(sekme, objs) { if (!objs.length) return; const c = await S.db.appendObjs(sekme, objs); objs.forEach(o => gunluk('Eklendi', sekme, ozetle(o))); await yerelEkle(sekme, objs, c); }
 // Kimlik (ya da verilen alan) ile satırı bulur, güncel tablodan satır numarasını okur
+// Satır numarası güvenliği için tablo yazmadan hemen önce tazeden okunur; yazdıktan sonra tekrar okunmaz, bu liste güncellenir
 async function satirBul(sekme, alan, deger) {
   const guncel = await S.db.table(sekme);
-  return guncel.find(r => String(r[alan]) === String(deger));
+  return { guncel, r: guncel.find(r => String(r[alan]) === String(deger)) };
 }
 export async function guncelle(sekme, kimlik, yeni, alan = 'Kimlik') {
-  const r = await satirBul(sekme, alan, kimlik);
+  const { guncel, r } = await satirBul(sekme, alan, kimlik);
   if (!r) throw new Error('Kayıt tabloda bulunamadı, sayfayı yenile');
   const { _row, ...eski } = r;
   await S.db.writeObj(sekme, _row, { ...eski, ...yeni });
   const degisen = Object.fromEntries(Object.entries(yeni).filter(([k, v]) => String(eski[k] ?? '') !== String(v ?? '')));
   if (Object.keys(degisen).length) gunluk('Değişti', sekme, `${r['Ad'] || r['Kalem'] || r['Not'] || r['Kod'] || ''} → ${ozetle(degisen)}`, ozetle(Object.fromEntries(Object.keys(degisen).map(k => [k, eski[k]]))));
-  await tazele(sekme);
+  const head = await S.db.head(sekme), son = { ...r }; Object.entries(yeni).forEach(([k, v]) => { if (head.includes(k)) son[k] = v === undefined || v === null ? '' : String(v); });
+  tabloKoy(sekme, guncel.map(x => x === r ? son : x));
 }
 export async function sil(sekme, kimlik, alan = 'Kimlik') {
-  const r = await satirBul(sekme, alan, kimlik);
-  if (r) { await S.db.deleteRow(sekme, r._row); gunluk('Silindi', sekme, ozetle(r), ozetle(r)); }
-  await tazele(sekme);
+  const { guncel, r } = await satirBul(sekme, alan, kimlik);
+  if (!r) return tabloKoy(sekme, guncel);
+  await S.db.deleteRow(sekme, r._row); gunluk('Silindi', sekme, ozetle(r), ozetle(r));
+  tabloKoy(sekme, guncel.filter(x => x !== r).map(x => x._row > r._row ? { ...x, _row: x._row - 1 } : x));
 }
 export async function silHepsi(sekme, f) {
   const guncel = await S.db.table(sekme);

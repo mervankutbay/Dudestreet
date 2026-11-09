@@ -85,7 +85,6 @@ body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--yazi); 
 a { color: var(--acik); }
 h1, h2, h3 { font-family: 'Space Grotesk', Inter, sans-serif; margin: 0; line-height: 1.15; }
 h1 { font-size: 30px; } h2 { font-size: 22px; } h3 { font-size: 17px; display: flex; align-items: center; gap: 8px; }
-.gotik { font-family: 'UnifrakturMaguntia', 'Old English Text MT', Georgia, serif; font-weight: 400; letter-spacing: 0; }
 .soluk { color: var(--soluk); } .soluk2 { color: var(--ikinci); } .mini { font-size: 12.5px; color: var(--soluk); } .kucuk { font-size: 13px; }
 .artı { color: var(--artı) !important; } .eksi { color: var(--eksi) !important; } .altin { color: var(--altin) !important; } .vurgu { color: var(--acik) !important; }
 .satir { display: flex; align-items: center; gap: 10px; } .bosluk { flex: 1; min-width: 0; } .ortala { text-align: center; } .sag { text-align: right; }
@@ -94,7 +93,7 @@ h1 { font-size: 30px; } h2 { font-size: 22px; } h3 { font-size: 17px; display: f
 .ayrac { display: flex; align-items: center; gap: 12px; } .ayrac::before, .ayrac::after { content: ''; flex: 1; height: 1px; background: rgba(255, 255, 255, .1); }
 
 /* Borsa bandı */
-.bant { position: sticky; top: 0; z-index: 30; height: calc(30px + var(--ust-bosluk)); padding-top: var(--ust-bosluk); background: rgba(0, 0, 0, .65); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid rgba(var(--acik-rgb), .14); overflow: hidden; font-family: 'Space Grotesk', ui-monospace, monospace; font-size: 12px; letter-spacing: .02em; }
+.bant { position: sticky; top: 0; z-index: 30; height: calc(30px + var(--ust-bosluk)); padding-top: var(--ust-bosluk); background: rgba(0, 0, 0, .9); border-bottom: 1px solid rgba(var(--acik-rgb), .14); overflow: hidden; font-family: 'Space Grotesk', ui-monospace, monospace; font-size: 12px; letter-spacing: .02em; }
 .bant-ic { display: inline-flex; gap: 26px; height: 30px; align-items: center; white-space: nowrap; padding-left: 100%; animation: kay 46s linear infinite; }
 .bant-ic span b { margin-left: 5px; }
 @keyframes kay { to { transform: translateX(-100%); } }
@@ -120,7 +119,7 @@ h1 { font-size: 30px; } h2 { font-size: 22px; } h3 { font-size: 17px; display: f
 .tip-sec:hover { border-color: rgba(var(--vurgu-rgb), .55); }
 .tip-sec .mini { font-weight: 400; line-height: 1.35; }
 .tip-ik { font-size: 30px; margin-bottom: 4px; }
-.sohbet-ust { position: sticky; top: calc(30px + var(--ust-bosluk)); z-index: 5; background: color-mix(in srgb, var(--bg) 85%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); padding: 6px 0; margin: -6px 0 0; }
+.sohbet-ust { position: sticky; top: calc(30px + var(--ust-bosluk)); z-index: 5; background: var(--bg); padding: 6px 0; margin: -6px 0 0; }
 .karakter-btn { justify-content: flex-start; gap: 10px; min-height: 52px; padding: 0 12px; background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .1); color: var(--yazi); text-align: left; font-weight: 700; }
 .karakter-btn .bosluk { display: flex; flex-direction: column; } .karakter-btn .mini { font-weight: 500; }
 .karakter-ik { font-size: 24px; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(var(--vurgu-rgb), .15); flex: none; }
@@ -284,13 +283,13 @@ button.blok-uyari { display: block; width: 100%; text-align: left; font-weight: 
 .oneriler button { flex: none; width: auto; white-space: nowrap; min-height: 36px; font-size: 13px; padding: 0 14px; border-radius: 999px; }
 
 /* Alt sekmeler */
-.sekmeler { position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; display: flex; justify-content: center; gap: 2px; padding: 7px 6px calc(7px + var(--alt-bosluk)); background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid rgba(255, 255, 255, .07); }
+.sekmeler { position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; display: flex; justify-content: center; gap: 2px; padding: 7px 6px calc(7px + var(--alt-bosluk)); background: var(--bg); border-top: 1px solid rgba(255, 255, 255, .07); }
 .sekmeler button { flex: 1; max-width: 120px; flex-direction: column; gap: 3px; min-height: 54px; background: transparent; color: var(--cok-soluk); font-weight: 600; font-size: 10.5px; padding: 0 2px; border-radius: 14px; white-space: nowrap; }
 .sekmeler button svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .sekmeler button.on { color: var(--acik); background: rgba(var(--vurgu-rgb), .12); }
 
 /* Pencere ve bildirim */
-.modal { position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, .6); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); display: flex; align-items: flex-end; justify-content: center; padding: 16px; padding-bottom: calc(16px + var(--alt-bosluk)); animation: belir .15s; }
+.modal { position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, .72); display: flex; align-items: flex-end; justify-content: center; padding: 16px; padding-bottom: calc(16px + var(--alt-bosluk)); animation: belir .15s; }
 .modal-kart { width: 100%; max-width: 520px; max-height: 88vh; overflow: auto; background: var(--kart-bg); border: 1px solid rgba(var(--acik-rgb), .16); border-radius: 24px; padding: 20px; animation: yuksel .2s; }
 .modal-kart.genis { max-width: 600px; }
 .modal-kart > * + * { margin-top: 12px; }
@@ -440,3 +439,7 @@ body.modal-acik { overflow: hidden; }
 .modal { touch-action: none; overscroll-behavior: contain; }
 .modal-kart { touch-action: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .notlar-ov, .notlar-ov .not-govde { overscroll-behavior: contain; }
+
+/* Akıcılık: kayan bant ayrı katmanda çizilir; kaydırırken pahalı bulanıklık yok */
+.bant-ic { will-change: transform; }
+.sekmeler, .bant { transform: translateZ(0); }

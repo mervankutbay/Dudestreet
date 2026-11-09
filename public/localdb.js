@@ -1,5 +1,5 @@
 // Demo modu: Google olmadan denemek için, SheetDB ile aynı arayüz; veriler bu tarayıcıda (localStorage) durur.
-import { colLetter } from './google.js';
+import { colLetter, satirlardanTablo, satirlardanKV } from './google.js';
 
 const KEY = 'ds_demo_db';
 
@@ -36,20 +36,16 @@ export class LocalDB {
     });
     this.save();
   }
-  async append(sheet, newRows) { (this.s.sheets[sheet] ||= []).push(...newRows.map(r => r.map(String))); this.save(); }
-  async table(sheet) {
-    const rows = this.s.sheets[sheet] || [];
-    if (!rows.length) return [];
-    const head = rows[0];
-    return rows.slice(1).map((r, i) => { const o = { _row: i + 2 }; head.forEach((h, c) => { o[h] = r[c] ?? ''; }); return o; });
-  }
+  async append(sheet, newRows) { const rows = (this.s.sheets[sheet] ||= []), ilk = rows.length + 1; rows.push(...newRows.map(r => r.map(String))); this.save(); return { updates: { updatedRange: `'${sheet}'!A${ilk}` } }; }
+  async okuHepsi(sheets) { const o = {}; sheets.forEach(s => { o[s] = (this.s.sheets[s] || []).map(r => [...r]); }); return o; }
+  async table(sheet) { return satirlardanTablo(this.s.sheets[sheet] || []); }
   async appendObj(sheet, obj) { const head = (this.s.sheets[sheet] || [[]])[0]; return this.append(sheet, [head.map(h => obj[h] ?? '')]); }
   async deleteRow(sheet, rowNumber) { (this.s.sheets[sheet] || []).splice(rowNumber - 1, 1); this.save(); }
   async deleteRows(sheet, rows) { [...new Set(rows)].sort((a, b) => b - a).forEach(r => (this.s.sheets[sheet] || []).splice(r - 1, 1)); this.save(); }
   async appendObjs(sheet, objs) { const head = (this.s.sheets[sheet] || [[]])[0]; return this.append(sheet, objs.map(o => head.map(h => o[h] ?? ''))); }
   async writeObj(sheet, row, obj) { const head = (this.s.sheets[sheet] || [[]])[0]; (this.s.sheets[sheet] ||= [])[row - 1] = head.map(h => String(obj[h] ?? '')); this.save(); }
   async head(sheet) { return (this.s.sheets[sheet] || [[]])[0]; }
-  async kv(sheet) { const o = {}; (this.s.sheets[sheet] || []).slice(1).forEach(r => { if (r[0]) o[r[0]] = r[1] ?? ''; }); return o; }
+  async kv(sheet) { return satirlardanKV(this.s.sheets[sheet] || []); }
   async setKV(sheet, values) {
     const rows = (this.s.sheets[sheet] ||= [['Anahtar', 'Değer']]);
     for (const [k, v] of Object.entries(values)) {

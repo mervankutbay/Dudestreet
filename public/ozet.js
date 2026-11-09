@@ -1,5 +1,5 @@
 // Dudestreet — Özet: toplam mal varlığı, dağılım, "Bugün" satırından açılan bakiye grafiği (Nébula'daki gibi, "Yatırım hariç" anahtarlı)
-import { S, $, $$, esc, num, money, fmt, today, buAy, ymAdi, ikon, lsGet, lsSet, kisaPara, tarihFmt, gunFark } from './core.js';
+import { S, $, $$, esc, num, money, fmt, today, buAy, ymAdi, ikon, lsGet, lsSet, kisaPara, tarihFmt, gunFark, ekle, onbellekYaz } from './core.js';
 import { malVarligi, hedefHesap, ayHesap, borclar, GRUP_RENK } from './hesap.js';
 import { bekleyenToplam } from './plan.js';
 
@@ -9,16 +9,17 @@ const GRUP_IK = { 'Nakit': '💰', 'Yatırım': '📈', 'Gayrimenkul': '🏠', '
 // ---------- Günlük kayıt: uygulama her açıldığında bugünün satırı Geçmiş sekmesine yazılır/güncellenir ----------
 let sonYazim = 0, yaziyor = false;
 export async function gecmisYaz() {
+  if (S.tazeBekle) await S.tazeBekle.catch(() => {});
   if (!S.db || yaziyor || Date.now() - sonYazim < 10 * 60e3) return;
   const canliVar = S.portfoy.some(p => !['Nakit / Banka', 'Ev / Daire', 'Arsa / Tarla', 'Araba', 'Diğer'].includes(p['Tür']));
   if (canliVar && !S.fiyat.zaman) return;   // fiyatlar gelmeden yazma (eksik değer kaydolmasın)
   yaziyor = true;
   try {
     const m = malVarligi(), satir = { Tarih: today(), Nakit: String(Math.round(m.nakit)), 'Varlık': String(Math.round(m.varlik)), 'Borç': String(Math.round(m.borc)), Toplam: String(Math.round(m.net)) };
-    const g = await S.db.table('Geçmiş'), bugun = g.find(r => String(r['Tarih']).slice(0, 10) === today());
-    if (bugun) { const { _row } = bugun; await S.db.writeObj('Geçmiş', _row, satir); }
-    else await S.db.appendObj('Geçmiş', satir);
-    S.gecmis = await S.db.table('Geçmiş');
+    // Geçmiş'e sadece sona satır eklenir, silinmez: eldeki liste satır numaraları için yeterli (tekrar okumaya gerek yok)
+    const bugun = S.gecmis.find(r => String(r['Tarih']).slice(0, 10) === today());
+    if (bugun) { await S.db.writeObj('Geçmiş', bugun._row, satir); Object.assign(bugun, satir); onbellekYaz(); }
+    else await ekle('Geçmiş', satir);
     sonYazim = Date.now();
   } catch (e) { console.warn('geçmiş yazılamadı', e); }
   yaziyor = false;

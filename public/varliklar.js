@@ -20,6 +20,8 @@ export async function fiyatlariGetir(sessiz = true) {
     ['USD', 'EUR', 'GBP'].forEach(s => { const f = j.fiyatlar?.[`Döviz|${s}`]; if (f && !f.hata) S.kurlar[s] = f.fiyat; });
     S.kurlar[paraKod()] = 1;
     if (mbk) S.mbkayo = m;
+    // Son fiyatlar bu cihazda saklanır: bir sonraki açılışta değerler maliyetten fiyata zıplamasın
+    try { localStorage.setItem('ds_fiyatOnbellek', JSON.stringify({ fiyat: { para: S.fiyat.para, fiyatlar: S.fiyat.fiyatlar }, kurlar: S.kurlar, mbkayo: S.mbkayo })); } catch { /* yer yok */ }
   } catch (e) {
     S.fiyat.hata = e.message;
     if (!sessiz) toast('⚠️ ' + esc(e.message));

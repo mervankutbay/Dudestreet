@@ -1,7 +1,7 @@
 // Dudestreet — kendi Wall Street'in.
 // Veri kullanıcının kendi Google Sheet'inde, yapay zekâ (Future Dude) kullanıcının kendi Gemini anahtarıyla.
 // Sunucu sadece piyasa fiyatlarını getirir; hiçbir kullanıcı verisi tutmaz.
-import { CONFIG, S, gecmisBaslat, $, $$, esc, num, money, fmt, today, buAy, ymAdd, uid, isDemo, toast, sheet, modal, onayKutusu, guard, ikon, pick, lsGet, lsSet, yuzde, fiyatFmt, gizli, gosterKod, gosterSimge, paraKod, pb } from './core.js';
+import { CONFIG, S, gecmisBaslat, TABLOLAR, onbellekOku, onbellekYaz, onbellekSil, $, $$, esc, num, money, fmt, today, buAy, ymAdd, uid, isDemo, toast, sheet, modal, onayKutusu, guard, ikon, pick, lsGet, lsSet, yuzde, fiyatFmt, gizli, gosterKod, gosterSimge, paraKod, pb } from './core.js';
 import * as G from './google.js';
 import * as AI from './gemini.js';
 import { runMigrations, pendingMigrations } from './schema.js';
@@ -27,12 +27,17 @@ async function boot() {
   temaUygula(aktifTema());
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   $$('#sekmeler button, .ust-btn').forEach(b => b.onclick = () => b.dataset.view === 'notlar' ? notlarAc() : go(b.dataset.view));
-  try { const r = await fetch('/api/ayar', { cache: 'no-store' }); if (r.ok) { const j = await r.json(); CONFIG.GOOGLE_CLIENT_ID = j.googleClientId || ''; S.sunucuSurum = j.surum || ''; } } catch { /* çevrimdışı */ }
+  // Sunucu ayarı açılışı bekletmez: sadece Google girişi gerekiyorsa beklenir
+  const ayarP = fetch('/api/ayar', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => { if (j) { CONFIG.GOOGLE_CLIENT_ID = j.googleClientId || ''; S.sunucuSurum = j.surum || ''; } }).catch(() => { /* çevrimdışı */ });
+  S.ayarP = ayarP;
+  // Son bilinen fiyatlar: taze fiyat gelene kadar onlarla çizilir (zaman boş kalır, fiyat yine çekilir; geçmişe yazılmaz)
+  try { const f = JSON.parse(localStorage.getItem('ds_fiyatOnbellek') || 'null'); if (f) { S.fiyat = { ...f.fiyat, zaman: null, hata: null }; S.kurlar = f.kurlar || {}; S.mbkayo = f.mbkayo || null; } } catch { /* yok say */ }
   ustAraclar();
   const r = G.handleRedirect();
   if (r.error && !['interaction_required', 'login_required', 'consent_required'].includes(r.error)) toast('Google girişi tamamlanmadı: ' + esc(r.error));
   if (isDemo()) { S.db = LocalDB.exists() ? new LocalDB() : await demoKur(); return baglandi(); }
   if (!G.getToken()) {
+    await ayarP;
     if (CONFIG.GOOGLE_CLIENT_ID && G.shouldSilentRefresh() && !r.error) return G.login({ silent: true });
     return wizard('hosgeldin');
   }
@@ -45,42 +50,69 @@ async function boot() {
   });
 }
 
-// Tüm sekmeleri okur; tablo eskiyse (yeni sekmeler eklendiyse) önce sessizce günceller (sadece ekleme yapar, veri silmez)
-async function yukle() {
-  const db = S.db;
-  S.meta = await db.kv('_meta');
-  S.sema = Number(S.meta.sema || 0);
-  if (pendingMigrations(S.sema).length) {
-    const ilk = S.sema > 0;
-    await runMigrations(db, S.sema);
-    S.meta = await db.kv('_meta'); S.sema = Number(S.meta.sema || 0);
-    if (ilk) toast('🛠️ Tablon yeni özellikler için güncellendi (verilerine dokunulmadı)');
-  }
-  const SEKMELER = ['Kayıtlar', 'Portföy', 'Hafıza', 'Gelir', 'Giderler', 'Bütçe', 'Onay', 'Kategori', 'Notlar', 'Borçlar', 'Borç hareketleri', 'Geçmiş'];
-  const [ayar, persona, ...tablolar] = await Promise.all([db.kv('Ayarlar'), db.kv('Persona'), ...SEKMELER.map(t => db.table(t))]);
-  const ALAN = { 'Kayıtlar': 'kayitlar', 'Portföy': 'portfoy', 'Hafıza': 'hafiza', 'Gelir': 'gelir', 'Giderler': 'giderler', 'Bütçe': 'butce', 'Onay': 'onay', 'Kategori': 'kategori', 'Notlar': 'notlar', 'Borçlar': 'borclar', 'Borç hareketleri': 'borcHareket', 'Geçmiş': 'gecmis' };
-  SEKMELER.forEach((t, i) => { S[ALAN[t]] = tablolar[i]; });
+// Tüm sekmeleri TEK istekte okur; tablo eskiyse (yeni sekmeler eklendiyse) önce sessizce günceller (sadece ekleme yapar, veri silmez)
+const SEKMELER = ['Kayıtlar', 'Portföy', 'Hafıza', 'Gelir', 'Giderler', 'Bütçe', 'Onay', 'Kategori', 'Notlar', 'Borçlar', 'Borç hareketleri', 'Geçmiş'];
+const OKUNAN = ['_meta', 'Ayarlar', 'Persona', ...SEKMELER];
+function veriKoy({ meta, ayar, persona, tablolar }) {
+  S.meta = meta; S.sema = Number(meta.sema || 0);
+  SEKMELER.forEach(t => { S[TABLOLAR[t]] = tablolar[t] || []; });
   S.portfoy = S.portfoy.filter(p => num(p['Adet']) > 0);
-  S.ayar = ayar;
-  if (!S.ayar.baslangic) { await db.setKV('Ayarlar', { baslangic: today() }); S.ayar.baslangic = today(); }
-  S.persona = persona; S._karakterler = null;
+  S.ayar = ayar; S.persona = persona; S._karakterler = null;
   try { S.persona.cevapObj = persona.cevaplar ? JSON.parse(persona.cevaplar) : null; } catch { S.persona.cevapObj = null; }
   if (!AI.getKey() && S.meta.gemini_key) AI.setKey(S.meta.gemini_key);
   if (!AI.getModel() && S.meta.gemini_model) AI.setModel(S.meta.gemini_model);
 }
+async function yukle() {
+  const db = S.db;
+  let ham = null;
+  // Bu cihaz tablonun güncel olduğunu biliyorsa doğrudan tek istekte okunur; bilmiyorsa önce sürümüne bakılır (eski tabloda eksik sekme toplu okumayı bozar)
+  const semaAnahtar = 'ds_sema_' + db.id, bilinen = Number(localStorage.getItem(semaAnahtar) || 0);
+  if (!pendingMigrations(bilinen).length) { try { ham = await db.okuHepsi(OKUNAN); } catch (e) { if (e.name === 'AuthError') throw e; } }
+  let meta = ham ? G.satirlardanKV(ham._meta) : await db.kv('_meta');
+  if (pendingMigrations(Number(meta.sema || 0)).length) {
+    const ilk = Number(meta.sema || 0) > 0;
+    await runMigrations(db, Number(meta.sema || 0));
+    ham = null;
+    if (ilk) toast('🛠️ Tablon yeni özellikler için güncellendi (verilerine dokunulmadı)');
+  }
+  if (!ham) { ham = await db.okuHepsi(OKUNAN); meta = G.satirlardanKV(ham._meta); }
+  const tablolar = {}; SEKMELER.forEach(t => { tablolar[t] = G.satirlardanTablo(ham[t]); });
+  veriKoy({ meta, ayar: G.satirlardanKV(ham.Ayarlar), persona: G.satirlardanKV(ham.Persona), tablolar });
+  try { localStorage.setItem(semaAnahtar, String(S.sema)); } catch { /* yok say */ }
+  if (!S.ayar.baslangic) { await db.setKV('Ayarlar', { baslangic: today() }); S.ayar.baslangic = today(); }
+  onbellekYaz();
+}
 S.yukle = yukle;
 
+// Uygulamanın açılabilmesi için kurulum adımları tamam mı?
+const kurulumTamam = () => (AI.getKey() || S.meta.gemini_atlandi === '1') && (S.ayar.hedef_ne || S.meta.hedef_atlandi === '1') && (karakterler().length || localStorage.getItem('ds_anket_sonra') === '1');
 async function baglandi() {
-  await guard(async () => {
-    app().innerHTML = '<div class="yukleniyor">Borsa açılıyor… 🔔</div>';
-    await yukle();
+  // Hız: son açılıştaki veriler bu cihazda durur; uygulama onlarla anında açılır, taze veri arkadan gelip sayfayı günceller
+  const ob = isDemo() ? null : onbellekOku(S.db.id);
+  let acik = false;
+  if (ob) {
+    try {
+      veriKoy({ meta: ob.meta || {}, ayar: ob.ayar || {}, persona: ob.persona || {}, tablolar: Object.fromEntries(SEKMELER.map(t => [t, ob[TABLOLAR[t]] || []])) });
+      if (kurulumTamam()) { go('ozet'); acik = true; }
+    } catch { acik = false; }
+  }
+  if (!acik) app().innerHTML = '<div class="yukleniyor">Borsa açılıyor… 🔔</div>';
+  S.tazeBekle = yukle();
+  try { await S.tazeBekle; }
+  catch (e) {
+    if (!acik || e?.name === 'AuthError') return guard(async () => { throw e; });
+    toast('⚠️ Güncel veriler alınamadı, son kaydedilenler gösteriliyor: ' + esc(e.message || e), 6000);
+    return;
+  } finally { S.tazeBekle = null; }
+  if (acik) S.yenile();
+  else {
     if (!AI.getKey() && S.meta.gemini_atlandi !== '1') return wizard('gemini');
     if (!S.ayar.hedef_ne && S.meta.hedef_atlandi !== '1') return wizard('hedef');
     if (!karakterler().length && localStorage.getItem('ds_anket_sonra') !== '1') return startSurvey();
     go('ozet');
-    setTimeout(otomatikYedek, 4000);
-    if (S.sunucuSurum && S.sunucuSurum !== CONFIG.APP_VERSION) setTimeout(() => toast(`⬆️ Yeni sürüm hazır (${esc(S.sunucuSurum)}). Ayarlar → Uygulamayı güncelle`, 7000), 1500);
-  });
+  }
+  setTimeout(otomatikYedek, 4000);
+  S.ayarP?.then(() => { if (S.sunucuSurum && S.sunucuSurum !== CONFIG.APP_VERSION) setTimeout(() => toast(`⬆️ Yeni sürüm hazır (${esc(S.sunucuSurum)}). Ayarlar → Uygulamayı güncelle`, 7000), 1500); });
 }
 
 // ---------- Üst çubuk: bakiye gizle, para birimi ----------
@@ -335,7 +367,9 @@ function renderAyarlar() {
   $('#cikis').onclick = () => {
     notFlush();
     if (isDemo()) { LocalDB.wipe(); localStorage.removeItem('ds_demo'); } else G.logout();
-    ['ds_gemini_key', 'ds_gemini_model', 'ds_anket_taslak', 'ds_anket_sonra', 'ds_plan', 'ds_notBekle', 'ds_sonNot', 'ds_katBekle', 'ds_gizli', 'ds_gosterPara', 'ds_demo_yedekler'].forEach(k => localStorage.removeItem(k));
+    onbellekSil();
+    ['ds_gemini_key', 'ds_gemini_model', 'ds_anket_taslak', 'ds_anket_sonra', 'ds_plan', 'ds_notBekle', 'ds_sonNot', 'ds_katBekle', 'ds_gizli', 'ds_gosterPara', 'ds_demo_yedekler', 'ds_fiyatOnbellek'].forEach(k => localStorage.removeItem(k));
+    Object.keys(localStorage).filter(k => k.startsWith('ds_sema_')).forEach(k => localStorage.removeItem(k));
     location.reload();
   };
 }

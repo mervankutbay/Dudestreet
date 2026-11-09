@@ -140,6 +140,20 @@ export function colLetter(n) { // 1 -> A
   return s;
 }
 
+// Ham satırlardan nesne listesi / anahtar-değer (Sheets ve demo aynı biçimi kullanır)
+export function satirlardanTablo(rows) {
+  if (!rows || !rows.length) return [];
+  const head = rows[0];
+  return rows.slice(1).map((r, i) => { const o = { _row: i + 2 }; head.forEach((h, c) => { o[h] = r[c] ?? ''; }); return o; });
+}
+export function satirlardanKV(rows) {
+  const o = {};
+  (rows || []).slice(1).forEach(r => { if (r[0]) o[r[0]] = r[1] ?? ''; });
+  return o;
+}
+// append cevabındaki "updatedRange"den eklenen ilk satır numarası ('Gelir'!A5:D7 → 5)
+export const eklenenSatir = res => { const m = String(res?.updates?.updatedRange || '').match(/![A-Z]+(\d+)/); return m ? Number(m[1]) : null; };
+
 export class SheetDB {
   constructor(id) { this.id = id; }
 
@@ -162,9 +176,21 @@ export class SheetDB {
 
   async info() { return api(`${SHEETS}/${this.id}?fields=properties.title,sheets.properties(title,sheetId)`); }
 
+  // Sekme listesi önbellekli (her silmede ayrıca okunmasın); sekme eklenince sıfırlanır
   async tabs() {
-    const j = await this.info();
-    return (j.sheets || []).map(s => s.properties);
+    if (!this._tabs) { const j = await this.info(); this._tabs = (j.sheets || []).map(s => s.properties); }
+    return this._tabs;
+  }
+
+  // Birden çok sekmeyi TEK istekte okur: { sekme: satırlar }. Başlık önbelleği de dolar.
+  async okuHepsi(sheets) {
+    const url = `${SHEETS}/${this.id}/values:batchGet?` + sheets.map(s => 'ranges=' + encodeURIComponent(q(s))).join('&');
+    const j = await api(url);
+    const out = {};
+    (j.valueRanges || []).forEach((vr, i) => { out[sheets[i]] = vr.values || []; });
+    this._heads ||= {};
+    sheets.forEach(s => { if (out[s]?.[0]) this._heads[s] = out[s][0]; });
+    return out;
   }
 
   async read(sheet, range = '') {
@@ -189,16 +215,7 @@ export class SheetDB {
   }
 
   // Başlık satırına göre nesne listesi (sütun sırası önemli değil, ada göre okunur)
-  async table(sheet) {
-    const rows = await this.read(sheet);
-    if (!rows.length) return [];
-    const head = rows[0];
-    return rows.slice(1).map((r, i) => {
-      const o = { _row: i + 2 };
-      head.forEach((h, c) => { o[h] = r[c] ?? ''; });
-      return o;
-    });
-  }
+  async table(sheet) { return satirlardanTablo(await this.read(sheet)); }
 
   // Başlık satırı (önbellekli: her eklemede tekrar okunmasın)
   async head(sheet) {
@@ -240,12 +257,7 @@ export class SheetDB {
   }
 
   // --- Anahtar/değer sekmeleri (_meta, Ayarlar) ---
-  async kv(sheet) {
-    const rows = await this.read(sheet, 'A:B');
-    const o = {};
-    rows.slice(1).forEach(r => { if (r[0]) o[r[0]] = r[1] ?? ''; });
-    return o;
-  }
+  async kv(sheet) { return satirlardanKV(await this.read(sheet, 'A:B')); }
 
   async setKV(sheet, values) {
     const rows = await this.read(sheet, 'A:B');
@@ -269,6 +281,7 @@ export class SheetDB {
     const tabs = await this.tabs();
     if (!tabs.some(t => t.title === title)) {
       await this.batch([{ addSheet: { properties: { title, gridProperties: { frozenRowCount: 1 } } } }]);
+      this._tabs = null;
     }
     const head = (await this.read(title, '1:1'))[0] || [];
     const missing = headers.filter(h => !head.includes(h));
