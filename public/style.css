@@ -318,7 +318,9 @@ button.blok-uyari { display: block; width: 100%; text-align: left; font-weight: 
 .gg-gecmis.on { background: rgba(var(--vurgu-rgb), .1); }
 .butce-satir { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .butce-satir input[data-f=kalem] { flex: 1; min-width: 0; }
-.butce-satir .bkalem { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.butce-satir .bkalem { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.butce-satir .bkalem input { width: 100%; }
+.butce-satir .bkalem .mini { padding-left: 4px; }
 .b-tutar { width: 110px !important; flex: none; text-align: right; }
 .emo-btn { width: 44px; min-height: 44px; padding: 0; border-radius: 12px; background: rgba(255, 255, 255, .06); font-size: 20px; flex: none; }
 

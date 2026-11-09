@@ -111,9 +111,18 @@ function kalemDuzenle({ baslik, ipucu = '', ad, kategori, tutar, tutarKilit = ''
   };
 }
 
+// Kalem adları aynı ay içinde benzersiz olmalı (onaylar ada göre tutulur)
+const adAnahtar = a => String(a || '').trim().toLocaleLowerCase('tr');
+function benzersizAd(ad, kullanilan) {
+  const kok = String(ad || '').trim(); if (!kok) return kok;
+  let a = kok, n = 2; while (kullanilan.has(adAnahtar(a))) a = `${kok} ${n++}`;
+  kullanilan.add(adAnahtar(a)); return a;
+}
+
 // ---------- Temel giderler (bütçe) penceresi ----------
 export function butceSheet(ym = buAy()) {
-  let items = butceAy(ym).map(b => ({ ...b }));
+  const ilkAdlar = new Set();
+  let items = butceAy(ym).map(b => ({ ...b, eski: b.kalem, kalem: benzersizAd(b.kalem, ilkAdlar) }));   // eskiden aynı adı alan kalemler 'Ad 2' olarak ayrılır
   const grup = butceGruplari(), sonraki = Object.keys(grup).sort().find(a => a > ym);
   const kapsam = sonraki ? `${ymAdi(ym)} – ${ymAdi(ymAdd(sonraki, -1))}` : `${ymAdi(ym)} ve sonrası`;
   const el = sheet(`<div class="satir"><h3 class="bosluk">Temel giderler</h3>${kapatBtn('bKapat')}</div>
@@ -126,7 +135,7 @@ export function butceSheet(ym = buAy()) {
     <button class="blok" id="bKaydet" style="margin-top:12px">Kaydet</button>`, { genis: true });
   $('#bKapat', el).onclick = () => el.remove();
   const sync = () => {
-    $$('.butce-satir', el).forEach(r => { const it = items[Number(r.dataset.i)]; const k = $('[data-f=kalem]', r); if (k) it.kalem = k.value.trim(); it.tutar = girdi($('[data-f=tutar]', r).value); });
+    $$('.butce-satir', el).forEach(r => { const it = items[Number(r.dataset.i)]; it.kalem = $('[data-f=kalem]', r).value.trim(); it.tutar = girdi($('[data-f=tutar]', r).value); });
     const sv = girdi($('#bMaas', el).value) - items.reduce((t, x) => t + num(x.tutar), 0) - num(S.ayar.aylik_min);
     $('#bSerbest', el).textContent = money(sv);
     $('#bSerbest', el).className = 'tutar ' + (sv < 0 ? 'eksi' : 'artı');
@@ -134,7 +143,7 @@ export function butceSheet(ym = buAy()) {
   const ciz = () => {
     $('#bSatirlar', el).innerHTML = items.map((it, i) => `<div class="butce-satir" data-i="${i}">
       <button type="button" class="emo-btn" data-emo="${i}" aria-label="Simge değiştir">${esc(butceIkon(it))}</button>
-      ${kalemSerbest(it.kategori) ? `<input data-f="kalem" value="${esc(it.kalem === it.kategori ? '' : it.kalem)}" maxlength="40" placeholder="Ne için? (ör. spor salonu)">` : `<div class="bkalem"><b>${esc(it.kalem || it.kategori)}</b><span class="mini">${esc(katAd(it.kategori))}</span></div>`}
+      <div class="bkalem"><input data-f="kalem" value="${esc(it.kalem)}" maxlength="40" placeholder="${it.kategori === 'Diğer' ? 'Ne için? (ör. spor salonu)' : esc(katAd(it.kategori))}" aria-label="Kalem adı"><span class="mini">${esc(katAd(it.kategori))}</span></div>
       <input data-f="tutar" class="b-tutar" inputmode="decimal" value="${fmtIn(it.tutar)}" placeholder="0">
       <button type="button" class="ikon-btn" data-rm="${i}" aria-label="Kaldır">${ic('carpi')}</button></div>`).join('') || '<p class="mini">Kalem yok</p>';
     $$('[data-rm]', el).forEach(b => b.onclick = () => { sync(); items.splice(Number(b.dataset.rm), 1); ciz(); });
@@ -145,14 +154,21 @@ export function butceSheet(ym = buAy()) {
   $('#bMaas', el).oninput = sync;
   const katSel = $('#bYeniKat', el);
   katSel.onchange = () => { if (katSel.value !== '__yeni') return; yeniKatSor(kod => { katSel.innerHTML = katSecenek(kod); katSel.value = kod; }, () => { katSel.value = 'Kira'; }); };
-  $('#bEkle', el).onclick = () => { sync(); const k = katSel.value; if (k === '__yeni') return katSel.onchange(); items.push({ kalem: kalemSerbest(k) ? '' : k, kategori: k, tutar: 0, ikon: BUTCE_KAT.some(x => x[0] === k) ? '' : katIkon(k) }); ciz(); const r = $$('.butce-satir', el).pop(); ($('[data-f=kalem]', r) || $('[data-f=tutar]', r))?.focus(); };
+  $('#bEkle', el).onclick = () => { sync(); const k = katSel.value; if (k === '__yeni') return katSel.onchange(); const ad = k === 'Diğer' ? '' : benzersizAd(katAd(k), new Set(items.map(x => adAnahtar(x.kalem))));
+    items.push({ kalem: ad, kategori: k, tutar: 0, ikon: BUTCE_KAT.some(x => x[0] === k) ? '' : katIkon(k) }); ciz();
+    const r = $$('.butce-satir', el).pop(), inp = $('[data-f=kalem]', r); inp.focus(); inp.select(); };
   $('#bKaydet', el).onclick = () => guard(async () => {
     sync();
-    if (items.some(x => kalemSerbest(x.kategori) && num(x.tutar) > 0 && !x.kalem)) return toast('Bu kaleme ne için olduğunu yaz ✍️');
+    const dolu = items.filter(x => num(x.tutar) > 0);
+    if (dolu.some(x => !x.kalem)) return toast('Her kaleme bir ad yaz ✍️');
+    const gorulen = new Set(), ayni = dolu.find(x => { const a = adAnahtar(x.kalem); if (gorulen.has(a)) return true; gorulen.add(a); return false; });
+    if (ayni) return toast(`İki kalemin adı aynı: “${ayni.kalem}”. Birini değiştir ✏️`);
     S.busy = true; $('#bKaydet', el).disabled = true;
     try {
       await katBekleyenYaz();
-      await butceAyYaz(ym, items.map(x => ({ ...x, kalem: x.kalem || x.kategori })));
+      await butceAyYaz(ym, items.map(({ eski, ...x }) => x));
+      // Adı değişen kalemin bu ayki onayı yeni adına taşınır
+      if (ym >= onayBasla()) for (const x of dolu) if (x.eski && x.eski !== x.kalem && onayKaydi(ym, x.eski) && !dolu.some(y => y.kalem === x.eski)) { await onayDegistir(ym, x.eski, false); await onayDegistir(ym, x.kalem, true); }
       await S.db.setKV('Ayarlar', { aylik_gelir: String(girdi($('#bMaas', el).value) || '') });
       S.ayar = await S.db.kv('Ayarlar');
     } finally { S.busy = false; }
@@ -172,10 +188,10 @@ export function renderGelirGider() {
   const okBtn = (attr, deger, acik, yazi) => `<button type="button" class="gg-ok ${acik ? 'on' : ''}" ${attr}="${esc(deger)}" aria-label="${yazi}">${ic('tik', 15)}</button>`;
   const silBtn = (attr, deger) => `<button type="button" class="gg-sil" ${attr}="${esc(deger)}" aria-label="Sil">${ic('carpi', 13)}</button>`;
   const ikonu = i => `<span class="gg-ik">${esc(i)}</span>`;
-  const sabitList = h.temel.map(b => {
+  const sabitList = h.temel.map((b, i) => {
     const ok = temelOnayli(ym, b.kalem), pl = ok ? null : temelPlan(b.kalem);
-    if (!onayAktif) return satir(`${ikonu(butceIkon(b))}${esc(b.kalem)}`, `${edBtn('data-ted', b.kalem)}−${money(b.tutar)}`, 'alt');
-    return `<div class="gg-satir alt ${ok ? '' : 'bek'}"><span>${ikonu(butceIkon(b))}${esc(b.kalem)}${pl && num(pl.tutar) > 0 && Math.abs(num(pl.tutar) - b.tutar) > 0.004 ? ` <span class="mini">notta ${money(pl.tutar)}</span>` : ''}</span><span class="tutar">${edBtn('data-ted', b.kalem)}−${money(pl && num(pl.tutar) > 0 ? pl.tutar : b.tutar)} ${ok ? okBtn('data-tgeri', b.kalem, true, 'Onayı geri al') : okBtn('data-tonay', b.kalem, false, 'Onayla')}</span></div>`;
+    if (!onayAktif) return satir(`${ikonu(butceIkon(b))}${esc(b.kalem)}`, `${edBtn('data-ted', i)}−${money(b.tutar)}`, 'alt');
+    return `<div class="gg-satir alt ${ok ? '' : 'bek'}"><span>${ikonu(butceIkon(b))}${esc(b.kalem)}${pl && num(pl.tutar) > 0 && Math.abs(num(pl.tutar) - b.tutar) > 0.004 ? ` <span class="mini">notta ${money(pl.tutar)}</span>` : ''}</span><span class="tutar">${edBtn('data-ted', i)}−${money(pl && num(pl.tutar) > 0 ? pl.tutar : b.tutar)} ${ok ? okBtn('data-tgeri', b.kalem, true, 'Onayı geri al') : okBtn('data-tonay', b.kalem, false, 'Onayla')}</span></div>`;
   }).join('');
   const bekPlan = buPlan.filter(p => p.tur !== 'satis' && !(p.tur === 'temel' && h.temel.some(b => b.kalem === p.ad && !temelOnayli(ym, b.kalem))));
   const planIkon = p => p.tur === 'temel' ? '📋' : katIkon(p.kategori || 'Diğer');
@@ -237,7 +253,7 @@ export function renderGelirGider() {
   $('#ggButce', v).onclick = () => butceSheet(ym);
   if (seg === 'gider') katCipBagla(v, 'ggKat', () => katYenile(v, 'ggKat'));
   raporBagla(v);
-  $$('[data-ted]', v).forEach(b => b.onclick = () => { const x = h.temel.find(t => t.kalem === b.dataset.ted); if (x) temelDuzenle(ym, x); });
+  $$('[data-ted]', v).forEach(b => b.onclick = () => { const i = Number(b.dataset.ted); if (h.temel[i]) temelDuzenle(ym, i); });
   $$('[data-ged]', v).forEach(b => b.onclick = () => { const g = h.giderler.find(x => x['Kimlik'] === b.dataset.ged); if (g) kalemDuzenle({ baslik: 'Harcamayı düzenle', ad: g['Kalem'] || g['Kategori'], kategori: g['Kategori'], tutar: num(g['Tutar']), tutarKilit: evet(g['Birikimden']) ? 'Birikimden ödendiği için tutar burada değişmez. Tutar yanlışsa silip yeniden ekle.' : '', kaydet: ({ ad, kategori, tutar }) => guncelle('Giderler', g['Kimlik'], { Kalem: ad, Kategori: kategori, Tutar: String(tutar), 'İkon': kategori === g['Kategori'] ? g['İkon'] : katIkon(kategori) }) }); });
   $$('[data-gped]', v).forEach(b => b.onclick = () => { const p = planListe().find(x => x.id === b.dataset.gped); if (p) kalemDuzenle({ baslik: 'Planı düzenle', ad: p.ad, kategori: p.kategori || 'Diğer', tutar: p.tutar, kaydet: async ({ ad, kategori, tutar }) => { planYaz(planOku().map(x => x.id === p.id ? { ...x, ad, kategori, tutar } : x)); } }); });
   $$('[data-tonay]', v).forEach(b => b.onclick = () => { const k = b.dataset.tonay, pl = temelPlan(k); if (pl) return planOnayla(pl, renderGelirGider); b.disabled = true; b.classList.add('on'); guard(async () => { await onayDegistir(ym, k, true); renderGelirGider(); }); });
@@ -271,13 +287,18 @@ export function renderGelirGider() {
 }
 
 // Temel giderin bu ayki tutarını düzenle (bu ay ve sonrası değişir)
-function temelDuzenle(ym, b) {
+function temelDuzenle(ym, idx) {
+  const b = butceAy(ym)[idx]; if (!b) return;
   kalemDuzenle({ baslik: 'Kalemi düzenle', ipucu: `${esc(ymAdi(ym))} ve sonrası için değişir, önceki aylar bozulmaz.`, ad: b.kalem, kategori: b.kategori, tutar: b.tutar, kaydet: async ({ ad, kategori, tutar }) => {
-    if (ad !== b.kalem && butceAy(ym).some(x => x.kalem === ad)) return toast('Bu adda başka bir kalem var');
+    const liste = butceAy(ym);
+    if (liste.some((x, i) => i !== idx && adAnahtar(x.kalem) === adAnahtar(ad))) return toast('Bu adda başka bir kalem var, farklı bir ad yaz');
     const onayliydi = temelOnayli(ym, b.kalem) && ym >= onayBasla();
-    const items = butceAy(ym).map(x => x.kalem === b.kalem ? { kalem: ad, kategori, tutar, ikon: kategori === x.kategori ? x.ikon : katIkon(kategori) } : x);
+    const items = liste.map((x, i) => i === idx ? { kalem: ad, kategori, tutar, ikon: kategori === x.kategori ? x.ikon : katIkon(kategori) } : x);
     await butceAyYaz(ym, items);
-    if (onayliydi && ad !== b.kalem) { await onayDegistir(ym, b.kalem, false); await onayDegistir(ym, ad, true); }
+    if (onayliydi && ad !== b.kalem) {
+      if (!items.some(x => x.kalem === b.kalem)) await onayDegistir(ym, b.kalem, false);   // aynı eski adı taşıyan başka kalem kaldıysa onu bozma
+      await onayDegistir(ym, ad, true);
+    }
     toast('Güncellendi ✏️');
   } });
 }
