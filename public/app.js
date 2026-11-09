@@ -1,7 +1,7 @@
 // Dudestreet — kendi Wall Street'in.
 // Veri kullanıcının kendi Google Sheet'inde, yapay zekâ (Future Dude) kullanıcının kendi Gemini anahtarıyla.
 // Sunucu sadece piyasa fiyatlarını getirir; hiçbir kullanıcı verisi tutmaz.
-import { CONFIG, S, $, $$, esc, num, money, fmt, today, buAy, ymAdd, uid, isDemo, toast, sheet, modal, onayKutusu, guard, ikon, pick, lsGet, lsSet, yuzde, fiyatFmt, gizli, gosterKod, gosterSimge, paraKod, pb } from './core.js';
+import { CONFIG, S, gecmisBaslat, $, $$, esc, num, money, fmt, today, buAy, ymAdd, uid, isDemo, toast, sheet, modal, onayKutusu, guard, ikon, pick, lsGet, lsSet, yuzde, fiyatFmt, gizli, gosterKod, gosterSimge, paraKod, pb } from './core.js';
 import * as G from './google.js';
 import * as AI from './gemini.js';
 import { runMigrations, pendingMigrations } from './schema.js';
@@ -105,6 +105,7 @@ const SAYFALAR = { ozet: renderOzet, gelirgider: renderGelirGider, varliklar: re
 function go(view) {
   if (!S.db) return;
   if (!SAYFALAR[view]) view = 'ozet';
+  gecmisBaslat();
   const ayni = S.view === view;
   S.view = view;
   chrome('ana');
@@ -114,6 +115,7 @@ function go(view) {
   if (['ozet', 'varliklar', 'hedef'].includes(view) && !S.fiyat.zaman && !S.fiyatBekliyor) fiyatYenile();
 }
 S.go = go;
+S.sayfaVar = v => !!SAYFALAR[v];
 S.wizard = a => wizard(a);
 S.yenile = () => { if (S.db && SAYFALAR[S.view] && !$$('.modal').length && !$('.notlar-ov')) { const y = scrollY; SAYFALAR[S.view](); bantCiz(); scrollTo(0, y); } else bantCiz(); };
 S.yenidenBaglan = () => renderReconnect();

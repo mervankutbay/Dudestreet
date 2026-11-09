@@ -431,3 +431,10 @@ button.pl-ok { color: var(--artı); border: 1.5px solid rgba(var(--altin-rgb), .
 .wordmark.buyuk { height: auto; width: min(300px, 78vw); display: block; margin: 0 auto; }
 .wordmark.orta { height: auto; width: 190px; display: block; margin: 0 auto; }
 @media (max-width: 400px) { .marka .wordmark { height: 34px; } }
+
+/* Kaydırma sabit (Nébula gibi): sayfa çekince yenilenmez/esnemez; pencere açıkken arkası kaymaz */
+html, body { overscroll-behavior-y: none; }
+body.modal-acik { overflow: hidden; }
+.modal { touch-action: none; overscroll-behavior: contain; }
+.modal-kart { touch-action: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.notlar-ov, .notlar-ov .not-govde { overscroll-behavior: contain; }

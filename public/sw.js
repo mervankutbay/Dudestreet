@@ -1,6 +1,6 @@
 // Dudestreet service worker: kod güncellemeleri sessizce gelsin (önce ağ, çevrimdışıysa önbellek).
 // Google, Gemini ve /api istekleri asla önbelleğe alınmaz.
-const CACHE = 'dudestreet-v5';
+const CACHE = 'dudestreet-v6';
 const SHELL = ['./', './index.html', './style.css', './app.js', './config.js', './core.js', './ui.js', './tema.js', './hesap.js', './plan.js', './ozet.js', './gelirgider.js', './notlar.js', './varliklar.js', './borclar.js', './hedef.js', './dude.js', './ai.js', './yedek.js', './google.js', './gemini.js', './schema.js', './persona.js', './localdb.js', './manifest.webmanifest', './img/wordmark.png', './img/icon-32.png', './img/icon-180.png', './img/icon-192.png', './img/icon-512.png'];
 
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL))); self.skipWaiting(); });

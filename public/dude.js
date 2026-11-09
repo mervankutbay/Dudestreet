@@ -26,6 +26,7 @@ const taslakKaydet = d => lsSet(TASLAK, d);
 export function startSurvey() { karakterTipiSec(true); }
 export function karakterTipiSec(kurulum = !karakterler().length) {
   S.view = 'anket'; chrome('sihirbaz');
+  S.icGeri = null;
   app().innerHTML = `${kurulum ? adimCubugu('persona') : ''}
     ${baslik(kurulum ? 'Adım 5 · Yapay zekâ' : 'Yeni karakter', 'Kiminle konuşmak istersin?', 'Uygulamanın içindeki yapay zekâ, seçtiğin karakter gibi konuşur; paranı, borçlarını, hedefini bilir ve senin için kayıt da yapar. İstediğin kadar karakter yaratıp aralarında geçiş yapabilirsin.')}
     <div class="tip-izgara">${TIPLER.map(t => `<button type="button" class="tip-sec" data-tip="${t.tip}"><span class="tip-ik">${t.ikon}</span><b>${t.ad}</b><span class="mini">${t.alt}</span></button>`).join('')}</div>
@@ -85,6 +86,7 @@ function renderSurvey() {
   $$('input[type=range]').forEach(r => (r.oninput = () => { $('#sv_' + r.dataset.q).textContent = r.value; }));
   $$('[data-q]').forEach(el => (el.onchange = topla));
   $('#aGeri').onclick = () => { topla(); if (A.idx > 0) { A.idx--; renderSurvey(); } else if (A.duzenle) S.go('persona'); else karakterTipiSec(A.kurulum); };
+  S.icGeri = () => { if (A.idx === 0 && A.duzenle) return false; $('#aGeri').click(); return true; };   // telefonun geri tuşu anketin bir önceki adımına döner
   $('#aIleri').onclick = () => {
     const d = topla();
     const eksik = sec.sorular.filter(q => q.zorunlu && !String(d[q.id] || '').trim());

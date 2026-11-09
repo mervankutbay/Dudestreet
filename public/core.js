@@ -124,6 +124,7 @@ export function sheet(html, { genis = false } = {}) {
   kok.className = 'modal';
   kok.innerHTML = `<div class="modal-kart ${genis ? 'genis' : ''}" role="dialog" aria-modal="true">${html}</div>`;
   document.body.appendChild(kok);
+  katmanKaydet(kok, () => kok.remove());
   const kart = kok.firstElementChild;
   kok.addEventListener('click', e => { if (e.target === kok && !S.busy) kok.remove(); });
   kart.remove2 = () => kok.remove();
@@ -133,6 +134,80 @@ export function sheet(html, { genis = false } = {}) {
   return kart;
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !S.busy) { const m = $$('.modal').pop(); if (m) m.remove(); } });
+
+// ---------- Geri tuşu ve kaydırma (Nébula gibi) ----------
+// Telefonun geri tuşu/hareketi: önce açık pencereyi kapatır, alt sayfadan (karakterler, anket) bir öncekine,
+// diğer sekmelerden Özet'e döner; Özet'te 2 kez basınca uygulamadan çıkar. Geri dönülen sayfa kaldığı yerden açılır.
+const ALT_SAYFA = new Set(['persona', 'anket', 'hazir']);
+const GC = { aktif: false, yoksay: 0, yigin: [], son: null, kaydir: {}, geriSon: 0, geriden: false, kuyruk: [], zaman: 0 };
+// Geçmiş işlemleri sırayla yürür: bir geri gidiş (history.back/go) bitmeden yeni kayıt eklenmez, yoksa geçmiş kayar ve uygulamadan çıkılır
+function sira(fn) { GC.kuyruk.push(fn); isle(); }
+function isle() {
+  if (GC.yoksay > 0 && Date.now() - GC.zaman > 1500) GC.yoksay = 0;   // gelmeyen bir dönüş kuyruğu kilitlemesin
+  while (GC.kuyruk.length && GC.yoksay === 0) GC.kuyruk.shift()();
+  if (GC.kuyruk.length) setTimeout(isle, 60);
+}
+function geriGit(n) { sira(() => { GC.yoksay++; GC.zaman = Date.now(); history.go(-n); }); }
+function it(tip) { sira(() => history.pushState({ ds: tip }, '')); }
+export function katmanKaydet(el, kapat, icGeri = null) {
+  if (!GC.aktif) return;
+  el._gecmis = true; el._kapat = kapat; el._icGeri = icGeri;
+  let itildi = false, iptal = false;
+  sira(() => { if (iptal) return; history.pushState({ ds: 'katman' }, ''); itildi = true; });
+  const asil = el.remove.bind(el);
+  el.remove = () => {
+    if (el._kapandi) return;
+    el._kapandi = true; asil();
+    if (!$$('.modal').length) document.body.classList.remove('modal-acik');
+    if (!itildi) { iptal = true; return; }
+    if (!el._geriIle) geriGit(1);
+  };
+  if (el.classList.contains('modal')) document.body.classList.add('modal-acik');
+}
+export function gecmisBaslat() {
+  if (GC.aktif) return;
+  GC.aktif = true; GC.son = null; GC.yigin = [];
+  history.replaceState({ ds: 'kok' }, ''); history.pushState({ ds: 'uygulama' }, '');
+  addEventListener('popstate', geriBasildi);
+}
+// Her sayfa çiziminde (chrome) çağrılır: ileri gidişleri geçmişe yazar
+export function gorunumKaydet(v) {
+  if (!GC.aktif || v === GC.son) return;
+  if (GC.son) GC.kaydir[GC.son] = scrollY;
+  S.icGeri = null;
+  const once = GC.son; GC.son = v;
+  if (GC.geriden || !once) return;
+  const Y = GC.yigin;
+  if (v === 'ozet') { if (Y.length) geriGit(Y.length); GC.yigin = []; return; }
+  const i = Y.indexOf(v);
+  if (i >= 0) { const n = Y.length - 1 - i; if (n) geriGit(n); Y.length = i + 1; return; }
+  if (ALT_SAYFA.has(v) || !Y.length) { Y.push(v); it('sayfa'); return; }
+  // sekmeden sekmeye: geçmişte tek basamak kalır (geri → Özet)
+  if (Y.length > 1) geriGit(Y.length - 1);
+  GC.yigin = [v];
+}
+function geriBasildi() {
+  if (GC.yoksay > 0) { GC.yoksay--; isle(); return; }
+  const acik = [...document.querySelectorAll('.modal, .notlar-ov')].filter(x => x._gecmis && !x._kapandi).pop();
+  if (acik) {
+    if (S.busy || (acik._icGeri && acik._icGeri())) { it('katman'); return; }   // kayıt sürüyorsa ya da pencere kendi içinde geri gittiyse açık kalır
+    acik._geriIle = true; acik._kapat(); return;
+  }
+  if (S.icGeri && S.icGeri()) { it('ic'); return; }
+  if (GC.yigin.length) {
+    GC.yigin.pop();
+    while (GC.yigin.length && !S.sayfaVar?.(GC.yigin[GC.yigin.length - 1])) GC.yigin.pop();
+    const hedef = GC.yigin[GC.yigin.length - 1] || 'ozet', y = GC.kaydir[hedef] || 0;
+    GC.geriden = true;
+    try { S.go(hedef); } finally { GC.geriden = false; }
+    requestAnimationFrame(() => scrollTo(0, y));
+    return;
+  }
+  if (Date.now() - GC.geriSon < 2200) { GC.aktif = false; history.back(); return; }
+  GC.geriSon = Date.now();
+  toast(pick(['Çıkmak için bir kez daha geri bas 👋', 'Borsadan çıkıyor musun? Bir kez daha bas 👋']));
+  it('uygulama');
+}
 export const kapatBtn = (id = 'kapat') => `<button class="ikon-btn" id="${id}" aria-label="Kapat">${ikon('carpi', 'currentColor', 18)}</button>`;
 export function modal(html) { $$('.modal').forEach(m => m.remove()); return html ? sheet(html) : null; }
 

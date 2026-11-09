@@ -1,6 +1,6 @@
 // Dudestreet — Notlar (Nébula'daki gibi): çok sayfalı notlar, "Listeye çevir" ile harcama listesi, gelir-gidere aktarma.
 // Ek: saat/tarih geçen satırlar (ör. "Özel ders akşam 16:30") için takvime alarmlı etkinlik ekleme.
-import { S, $, $$, esc, num, money, today, buAy, uid, toast, sheet, onayKutusu, guard, ikon, pick, trFold, buyukIlk, lsGet, lsSet, tutarAlan, fmtIn, isDemo, girdi } from './core.js';
+import { S, $, $$, katmanKaydet, esc, num, money, today, buAy, uid, toast, sheet, onayKutusu, guard, ikon, pick, trFold, buyukIlk, lsGet, lsSet, tutarAlan, fmtIn, isDemo, girdi } from './core.js';
 import { butceAy, katIkon, birlesikKat, katAd, varliklar, ayHesap } from './hesap.js';
 
 const KAT_ANAHTAR = {
@@ -211,6 +211,7 @@ export function notlarAc() {
   let kapali = false, aynaGuncelle = null;
   const kapat = () => { if (kapali) return; kapali = true; durumYaz = () => {}; senk(); flush(); document.body.classList.remove('not-acik'); el.remove(); S.yenile(); };
   const git = (view, id = null) => { nb.view = view; nb.id = id; ciz(); const g = $('.not-govde', el); if (g) g.scrollTop = 0; };
+  katmanKaydet(el, kapat, () => { if (nb.view === 'liste') return false; const g = $('#nbGeri', el); if (g) g.click(); else git('liste'); return true; });   // geri tuşu: nottan listeye, listeden kapat
 
   function snack(yazi, geriAl) {
     $('.nb-snack', el)?.remove();

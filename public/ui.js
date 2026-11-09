@@ -1,8 +1,9 @@
 // Dudestreet — sayfa çerçevesi yardımcıları (sihirbaz/ana görünüm, adım çubuğu, başlıklar)
-import { S, $, $$, ikon, isDemo } from './core.js';
+import { S, $, $$, ikon, isDemo, gorunumKaydet } from './core.js';
 import * as G from './google.js';
 
 export function chrome(mod) { // 'sihirbaz' | 'ana'
+  gorunumKaydet(S.view);
   const ana = mod === 'ana';
   $('#sekmeler').classList.toggle('hidden', !ana);
   $('#ust').classList.toggle('hidden', !ana);
