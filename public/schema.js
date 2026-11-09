@@ -23,6 +23,30 @@ export const MIGRATIONS = [
       await db.ensureSheet('Hafıza', ['Tarih', 'Not', 'Kaynak']);
     },
   },
+  {
+    to: 2,
+    title: 'Gelir-gider, notlar, borçlar, mal varlığı',
+    changes: [
+      '➕ "Gelir", "Giderler", "Bütçe", "Onay", "Kategori" sekmeleri (gelir-gider takibi)',
+      '➕ "Notlar" sekmesi',
+      '➕ "Borçlar" ve "Borç hareketleri" sekmeleri (kredi kartları)',
+      '➕ "Geçmiş" sekmesi (günlük mal varlığı grafiği)',
+      '➕ "Portföy"e "Yıllık artış" ve "Hedef" sütunları (ev/araba değer artışı, hedefe bağlama)',
+    ],
+    async run(db) {
+      await db.ensureSheet('Gelir', ['Kimlik', 'Tarih', 'Tutar', 'Not']);
+      await db.ensureSheet('Giderler', ['Kimlik', 'Tarih', 'Kalem', 'Kategori', 'Tutar', 'Birikimden', 'Not', 'İkon']);
+      await db.ensureSheet('Bütçe', ['Ay', 'Kalem', 'Kategori', 'Tutar', 'İkon']);
+      await db.ensureSheet('Onay', ['Ay', 'Kalem', 'Tarih']);
+      await db.ensureSheet('Kategori', ['Kod', 'Ad', 'İkon', 'Silindi']);
+      await db.ensureSheet('Notlar', ['Kimlik', 'Metin', 'Güncelleme', 'Sabit']);
+      await db.ensureSheet('Borçlar', ['Kimlik', 'Tür', 'Ad', 'Banka', 'Limit', 'Borç', 'Asgari', 'Kesim', 'Son ödeme', 'Not']);
+      await db.ensureSheet('Borç hareketleri', ['Kimlik', 'Borç', 'Tarih', 'Tür', 'Tutar', 'Not']);
+      await db.ensureSheet('Geçmiş', ['Tarih', 'Nakit', 'Varlık', 'Borç', 'Toplam']);
+      await db.ensureSheet('Portföy', ['Yıllık artış', 'Hedef']);
+      await db.ensureSheet('Kayıtlar', ['Bağ']);
+    },
+  },
 ];
 
 export const pendingMigrations = current => MIGRATIONS.filter(m => m.to > current);

@@ -45,6 +45,10 @@ export class LocalDB {
   }
   async appendObj(sheet, obj) { const head = (this.s.sheets[sheet] || [[]])[0]; return this.append(sheet, [head.map(h => obj[h] ?? '')]); }
   async deleteRow(sheet, rowNumber) { (this.s.sheets[sheet] || []).splice(rowNumber - 1, 1); this.save(); }
+  async deleteRows(sheet, rows) { [...new Set(rows)].sort((a, b) => b - a).forEach(r => (this.s.sheets[sheet] || []).splice(r - 1, 1)); this.save(); }
+  async appendObjs(sheet, objs) { const head = (this.s.sheets[sheet] || [[]])[0]; return this.append(sheet, objs.map(o => head.map(h => o[h] ?? ''))); }
+  async writeObj(sheet, row, obj) { const head = (this.s.sheets[sheet] || [[]])[0]; (this.s.sheets[sheet] ||= [])[row - 1] = head.map(h => String(obj[h] ?? '')); this.save(); }
+  async head(sheet) { return (this.s.sheets[sheet] || [[]])[0]; }
   async kv(sheet) { const o = {}; (this.s.sheets[sheet] || []).slice(1).forEach(r => { if (r[0]) o[r[0]] = r[1] ?? ''; }); return o; }
   async setKV(sheet, values) {
     const rows = (this.s.sheets[sheet] ||= [['Anahtar', 'Değer']]);

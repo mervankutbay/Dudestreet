@@ -188,10 +188,37 @@ export class SheetDB {
     });
   }
 
+  // Başlık satırı (önbellekli: her eklemede tekrar okunmasın)
+  async head(sheet) {
+    this._heads ||= {};
+    if (!this._heads[sheet]) this._heads[sheet] = (await this.read(sheet, '1:1'))[0] || [];
+    return this._heads[sheet];
+  }
+
   // Başlıklara göre satır ekle (eksik sütunlar boş kalır)
   async appendObj(sheet, obj) {
-    const head = (await this.read(sheet, '1:1'))[0] || [];
+    const head = await this.head(sheet);
     return this.append(sheet, [head.map(h => obj[h] ?? '')]);
+  }
+  async appendObjs(sheet, objs) {
+    if (!objs.length) return;
+    const head = await this.head(sheet);
+    return this.append(sheet, objs.map(o => head.map(h => o[h] ?? '')));
+  }
+
+  // Bir satırı başlıklara göre yeniden yaz
+  async writeObj(sheet, row, obj) {
+    const head = await this.head(sheet);
+    return this.write(sheet, `A${row}:${colLetter(head.length)}${row}`, [head.map(h => obj[h] ?? '')]);
+  }
+
+  // Birden çok satırı sil (aşağıdan yukarı, numaralar kaymasın)
+  async deleteRows(sheet, rowNumbers) {
+    if (!rowNumbers.length) return;
+    const tab = (await this.tabs()).find(t => t.title === sheet);
+    if (!tab) return;
+    const sirali = [...new Set(rowNumbers)].sort((a, b) => b - a);
+    return this.batch(sirali.map(r => ({ deleteDimension: { range: { sheetId: tab.sheetId, dimension: 'ROWS', startIndex: r - 1, endIndex: r } } })));
   }
 
   async deleteRow(sheet, rowNumber) {
@@ -237,6 +264,7 @@ export class SheetDB {
       const start = head.length + 1;
       await this.write(title, `${colLetter(start)}1:${colLetter(start + missing.length - 1)}1`, [missing]);
     }
+    if (this._heads) delete this._heads[title];
   }
 
   async ensureColumn(title, header) { return this.ensureSheet(title, [header]); }

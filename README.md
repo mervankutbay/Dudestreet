@@ -7,6 +7,19 @@ Kendi Wall Street'in. Birikimini ve portföyünü takip eden kişisel finans PWA
 - **Sunucu sadece fiyat getirir.** Cloudflare Worker yalnızca Yahoo Finance'tan fiyat ve arama sonucu getirir; kullanıcı verisi oradan geçmez.
 - **Demo modu:** Google'a bağlanmadan, örnek verilerle denenebilir (veriler sadece o tarayıcıda durur).
 
+## Sekmeler
+- **Özet:** toplam mal varlığı (varlıklar − borçlar), dağılım; "Bugün" satırına dokununca açılan grafik ("Yatırım hariç" anahtarlı)
+- **Gelir-Gider:** Nébula'daki sistem: ay ay gelir, temel giderler (✓ onay, ay ay değişen bütçe), ek giderler, kendi kategoriler, harcama raporu
+- **Varlıklar:** hisse, kripto, fon, altın/gümüş, döviz, nakit/banka, ev, arsa, araba, MBKAYO payı (yayınlanan MBKAYO tablosundan canlı toplam ÷ 6)
+- **Borçlar:** kredi kartları (limit, borç, asgari, kesim ve son ödeme günü), krediler, kişilere borçlar
+- **Hedef:** aylık birikim hedefi, birikim hesabı, hedefe bağlı varlıklar
+- Üstte: **Notlar** (Listeye çevir → gelir-gidere aktarma; saat geçen satırlara takvim alarmı), **Future Dude**, **Ayarlar** (6 koyu tema)
+
+## Değer artışı varsayımları
+- Ev / arsa: TCMB Konut Fiyat Endeksi yıllık değişimi (Eylül 2026: %22,3)
+- Araba: ikinci el otomobil fiyat endeksleri (2026 nominal ~%15-20, varsayılan %16)
+Her varlıkta oran değiştirilebilir; değer, girilen tarihten bugüne bileşik olarak büyütülür.
+
 ## Yapı
 
 ```
@@ -17,7 +30,7 @@ public/            Site (PWA)
   persona.js       Future Dude anketi ve kişilik metni
   schema.js        Tablo sekmeleri ve sürüm geçişleri
   localdb.js       Demo modu (tarayıcıda)
-src/worker.js      /api/ayar, /api/fiyatlar, /api/ara
+src/worker.js      /api/ayar, /api/fiyatlar, /api/ara, /api/mbkayo
 wrangler.jsonc     Cloudflare ayarı
 ```
 

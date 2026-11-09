@@ -109,6 +109,72 @@ async function ara(q) {
     .map(x => (x.tur === 'Endeks' || x.tur === 'Emtia' || x.tur === 'Döviz' ? { ...x, tur: 'Hisse' } : x));
 }
 
+// ---------- MBKAYO bireysel bakiye ----------
+// MBKAYO fonunun yayınlanmış "Canlı Bakiye" tablosundan varlıkları (isim, adet) ve nakdi okur, fiyatları canlı çeker, toplamı 6'ya böler.
+const MBKAYO_CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDOcXpS6WsMaXzqXVB030Nd-T7atxODPiP_8kxjEhMCndS_en6qgsEt5vKk44koRN9agtfaoDa7eDY/pub?gid=512531579&single=true&output=csv';
+const MBKAYO_KISI = 6;
+const KRIPTO = new Set(['BTC', 'ETH', 'XRP', 'SOL', 'DOGE', 'SUI', 'AVAX', 'ADA', 'DOT', 'LINK', 'XLM', 'TRX', 'BNB', 'LTC', 'SHIB', 'PEPE', 'TON', 'NEAR', 'APT', 'ARB', 'OP', 'ATOM', 'HBAR', 'RENDER', 'INJ', 'FET']);
+const YAHOO_OZEL = { SUI: 'SUI20947-USD', PEPE: 'PEPE24478-USD', TON: 'TON11419-USD', APT: 'APT21794-USD', ARB: 'ARB11841-USD', RENDER: 'RENDER-USD' };
+function csvSatirlar(t) {
+  const out = []; let satir = [], hucre = '', tirnak = false;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (tirnak) { if (c === '"') { if (t[i + 1] === '"') { hucre += '"'; i++; } else tirnak = false; } else hucre += c; }
+    else if (c === '"') tirnak = true;
+    else if (c === ',') { satir.push(hucre); hucre = ''; }
+    else if (c === '\n') { satir.push(hucre.replace(/\r$/, '')); out.push(satir); satir = []; hucre = ''; }
+    else hucre += c;
+  }
+  if (hucre || satir.length) { satir.push(hucre); out.push(satir); }
+  return out;
+}
+const trSayi = v => {
+  const s = String(v || '').replace(/[₺$\s%]/g, '').trim(); if (!s || !/\d/.test(s)) return null;
+  let n = s;
+  if (s.includes(',')) n = s.replace(/\./g, '').replace(',', '.');
+  else if (/^-?[1-9]\d{0,2}(\.\d{3})+$/.test(s)) n = s.replace(/\./g, '');
+  const x = Number(n); return Number.isFinite(x) ? x : null;
+};
+async function mbkayo(para) {
+  const cache = typeof caches !== 'undefined' ? caches.default : null, key = new Request('https://dudestreet.cache/mbkayo-csv');
+  let metin = null;
+  if (cache) { const h = await cache.match(key); if (h) metin = await h.text(); }
+  if (!metin) {
+    const r = await zamanAsimi(fetch(MBKAYO_CSV + '&t=' + Date.now(), { headers: UA }), 8000);
+    if (!r.ok) throw new Error('MBKAYO tablosu okunamadı (HTTP ' + r.status + ')');
+    metin = await r.text();
+    if (cache) await cache.put(key, new Response(metin, { headers: { 'cache-control': 'max-age=60' } })).catch(() => {});
+  }
+  const satirlar = csvSatirlar(metin);
+  const bas = satirlar.findIndex(r => String(r[1]).trim() === 'İsim' && /adet/i.test(r[2] || ''));
+  if (bas < 0) throw new Error('MBKAYO tablosunun yapısı değişmiş');
+  const kalemler = []; let nakit = 0, tabloToplam = null;
+  for (let i = bas + 1; i < satirlar.length; i++) {
+    const r = satirlar[i], ad = String(r[1] || '').trim();
+    if (/^NAK[İI]T$/i.test(ad)) { nakit = trSayi(r[6]) ?? trSayi(r[5]) ?? 0; break; }
+    const adet = trSayi(r[2]);
+    if (!ad || adet === null || !(adet > 0)) continue;
+    kalemler.push({ ad, adet, tabloFiyat: trSayi(r[3]), tabloDeger: trSayi(r[6]) });
+  }
+  const tb = satirlar.findIndex(r => r.some(h => /^Toplam Bakiye$/i.test(String(h).trim())));
+  if (tb >= 0 && satirlar[tb + 1]) tabloToplam = trSayi(satirlar[tb + 1][3]);
+  // Canlı fiyatlar (TL)
+  const usdtry = await kur('USD', 'TRY').catch(() => null);
+  await Promise.all(kalemler.map(async k => {
+    const taban = k.ad.toUpperCase().replace(/\d+$/, '');
+    const sembol = KRIPTO.has(taban) ? (YAHOO_OZEL[taban] || `${taban}-USD`) : `${taban}.IS`;
+    try {
+      const f = await yahooFiyat(sembol);
+      const carpan = f.para === 'TRY' ? 1 : f.para === 'USD' && usdtry ? usdtry : await kur(f.para, 'TRY');
+      k.fiyat = f.fiyat * carpan; k.canli = true;
+    } catch (e) { k.fiyat = k.tabloFiyat ?? (k.tabloDeger && k.adet ? k.tabloDeger / k.adet : 0); k.canli = false; }
+    k.deger = k.adet * k.fiyat;
+  }));
+  const toplamTL = kalemler.reduce((s, k) => s + k.deger, 0) + nakit;
+  const hedef = paraKodu(para), carp = hedef === 'TRY' ? 1 : 1 / await kur(hedef, 'TRY');
+  return { para: hedef, toplam: toplamTL * carp, kisiBasi: toplamTL * carp / MBKAYO_KISI, kisi: MBKAYO_KISI, nakit: nakit * carp, tabloToplam: tabloToplam !== null ? tabloToplam * carp : null, kalemler: kalemler.map(k => ({ ad: k.ad, adet: k.adet, deger: k.deger * carp, canli: k.canli })), zaman: new Date().toISOString() };
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -123,6 +189,10 @@ export default {
           .map(x => ({ tur: String(x.tur || 'Hisse').slice(0, 20), sembol: String(x.sembol || '').slice(0, 24) }))
           .filter(x => x.sembol || x.tur.includes('gram'));
         return json(await fiyatlar(liste, b.para || 'TRY'));
+      }
+      if (p === '/api/mbkayo') {
+        try { return json(await mbkayo(url.searchParams.get('para') || 'TRY')); }
+        catch (e) { return json({ hata: String(e.message || e).slice(0, 120) }, 200); }
       }
       if (p === '/api/ara') {
         const q = (url.searchParams.get('q') || '').trim().slice(0, 40);

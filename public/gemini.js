@@ -47,3 +47,14 @@ export async function chat({ key, model, system, history }) {
   if (!text) throw new Error(j.promptFeedback?.blockReason ? 'Cevap engellendi: ' + j.promptFeedback.blockReason : 'Boş cevap geldi.');
   return text;
 }
+
+// Tek seferlik JSON cevap (notlardaki belirsiz satırları sınıflandırmak gibi işler için)
+export async function jsonSor({ key, model, prompt, sure = 15000 }) {
+  const body = { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0, responseMimeType: 'application/json' } };
+  const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), sure);
+  try {
+    const j = await call(`${model}:generateContent`, key, { method: 'POST', body: JSON.stringify(body), signal: ctrl.signal });
+    const text = (j.candidates?.[0]?.content?.parts || []).filter(p => !p.thought).map(p => p.text || '').join('');
+    return JSON.parse(text.replace(/^```(?:json)?|```$/g, '').trim());
+  } finally { clearTimeout(t); }
+}
