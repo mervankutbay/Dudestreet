@@ -337,7 +337,9 @@ async function wizard(adim) {
         <div class="kart satir kucuk" style="align-items:flex-start;color:var(--ikinci)">${ikon('kilit', '#f5c542', 20)}<span>Tablo senin. İstediğin zaman Google Sheets’te açıp bakabilir, indirebilir ya da silebilirsin.</span></div>`;
       $$('[data-kullan]').forEach(b => (b.onclick = () => { G.setSheetId(b.dataset.kullan); S.db = new G.SheetDB(b.dataset.kullan); afterConnect(); }));
       $('#olustur').onclick = () => guard(async () => {
-        $('#olustur').disabled = true; $('#olustur').textContent = 'Oluşturuluyor…';
+        const btn = $('#olustur'), eskiYazi = btn.textContent;
+        btn.disabled = true; btn.textContent = 'Oluşturuluyor…';
+        setTimeout(() => { if (btn.isConnected) { btn.disabled = false; btn.textContent = eskiYazi; } }, 20000);
         const db = await G.SheetDB.create(CONFIG.TABLO_ADI);
         await runMigrations(db, 0);
         await db.setKV('_meta', { uygulama: 'Dudestreet', olusturma: new Date().toISOString() });

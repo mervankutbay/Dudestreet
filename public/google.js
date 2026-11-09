@@ -136,7 +136,10 @@ export class SheetDB {
       method: 'POST',
       body: JSON.stringify({
         properties: { title, locale: 'tr_TR' },
-        sheets: [{ properties: { title: '_meta', hidden: true } }],
+        sheets: [
+          { properties: { title: 'Ayarlar', index: 0, gridProperties: { frozenRowCount: 1 } } },
+          { properties: { title: '_meta', hidden: true } },
+        ], // ilk sayfa gizli olamaz
       }),
     });
     const db = new SheetDB(j.spreadsheetId);
