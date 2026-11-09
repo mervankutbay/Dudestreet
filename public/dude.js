@@ -255,7 +255,7 @@ export function renderDude() {
     <div style="height:130px"></div>
     <div class="yazma"><div class="yazma-ic" style="flex-direction:column;align-items:stretch">
       ${S.chat.some(m => m.role === 'user') ? '' : `<div class="oneriler">${ONERI.map(o => `<button class="ikinci" data-oneri="${esc(o)}">${esc(o)}</button>`).join('')}</div>`}
-      <div class="satir" style="align-items:flex-end"><textarea id="girdi" rows="1" placeholder="${esc(k.ad)}’a yaz… (ör. markete 1.200 verdim)" aria-label="Mesaj"></textarea><button id="gonder" aria-label="Gönder">${ic('gonder', 20)}</button></div>
+      <div class="satir" style="align-items:flex-end"><textarea id="girdi" rows="1" placeholder="${esc(k.ad)}’a yaz…" aria-label="Mesaj"></textarea><button id="gonder" aria-label="Gönder">${ic('gonder', 20)}</button></div>
     </div></div>`;
   $('#kDegis').onclick = karakterMenu;
   if ($('#temizle')) $('#temizle').onclick = () => { S.chat = []; sohbetYaz(k, []); renderDude(); };
